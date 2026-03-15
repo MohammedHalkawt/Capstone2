@@ -1,19 +1,42 @@
-from TTS.api import TTS
-import torch
+import warnings
+warnings.filterwarnings("ignore")
 
-# Load XTTS v2 — downloads model on first run (~1.8GB)
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
-tts.to("cuda" if torch.cuda.is_available() else "cpu")
+import torchaudio
+from chatterbox.tts import ChatterboxTTS
+import time
 
-# Your reference WAV — just 3-6 seconds of the voice you want to clone
-REFERENCE_VOICE = "jarvis-intro-1.wav"  # your target voice file
+OUTPUT_FILE = "output.wav"
+REFERENCE_WAV = "jarvis-intro-1.wav"  # ← put your reference WAV file here
 
-def synthesize(text: str, out_path: str = "output.wav"):
-    tts.tts_to_file(
-        text=text,
-        speaker_wav=REFERENCE_VOICE,   # ← this is the cloning part
-        language="en",
-        file_path=out_path
-    )
+print("Loading model... (this takes ~60 seconds, only happens once)")
+start = time.time()
+model = ChatterboxTTS.from_pretrained(device="cuda")
+print(f"Model ready in {time.time() - start:.1f}s\n")
 
-synthesize("All systems are online. How may I assist you today?")
+def synthesize(text: str):
+    wav = model.generate(text, audio_prompt_path=REFERENCE_WAV)
+    torchaudio.save(OUTPUT_FILE, wav, model.sr)
+
+while True:
+    text = input("Enter text: ").strip()
+    
+    if not text:
+        print("No text entered, try again.")
+        continue
+
+    print("Generating audio...")
+    start = time.time()
+    synthesize(text)
+    print(f"Done in {time.time() - start:.1f}s → saved to {OUTPUT_FILE}")
+
+    choice = input("Press 1 for more, 0 to quit: ").strip()
+    
+    if choice == "0":
+        print("Shutting down.")
+        break
+    elif choice == "1":
+        print()
+        continue
+    else:
+        print("Invalid input, shutting down.")
+        break
