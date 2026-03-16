@@ -2,19 +2,23 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import torchaudio
-from chatterbox.tts import ChatterboxTTS
+from chatterbox.tts_turbo import ChatterboxTurboTTS
 import time
 
-OUTPUT_FILE = "output.wav"
-REFERENCE_WAV = "jarvis-intro-1.wav"  # ← put your reference WAV file here
+OUTPUT_FILE = "TTS/output.wav"
+REFERENCE_WAV = "TTS/jarvis-intro-1.wav"  # ← put your reference WAV file here
 
 print("Loading model... (this takes ~60 seconds, only happens once)")
 start = time.time()
-model = ChatterboxTTS.from_pretrained(device="cuda")
+model = ChatterboxTurboTTS.from_pretrained(device="cuda")
 print(f"Model ready in {time.time() - start:.1f}s\n")
 
 def synthesize(text: str):
-    wav = model.generate(text, audio_prompt_path=REFERENCE_WAV)
+    wav = model.generate(
+        text,
+        audio_prompt_path=REFERENCE_WAV,
+        cfg_weight=0.3  # ← default is 0.5, lower = faster
+    )
     torchaudio.save(OUTPUT_FILE, wav, model.sr)
 
 while True:

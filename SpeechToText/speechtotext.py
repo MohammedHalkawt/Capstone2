@@ -4,7 +4,7 @@ import json
 import re
 from vosk import Model, KaldiRecognizer
 
-MODEL_PATH = "vosk-model-small-en-us-0.15"
+MODEL_PATH = "SpeechToText/vosk-model-small-en-us-0.15"
 SAMPLE_RATE = 16000
 
 print("Loading model...")
