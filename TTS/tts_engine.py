@@ -5,8 +5,8 @@ import torchaudio
 from chatterbox.tts_turbo import ChatterboxTurboTTS
 import time
 
-OUTPUT_FILE = "TTS/output.wav"
-REFERENCE_WAV = "TTS/jarvis-intro-1.wav"  # ← put your reference WAV file here
+OUTPUT_FILE = "output.wav"
+REFERENCE_WAV = "jarvis-intro-1.wav"  # ← put your reference WAV file here
 
 print("Loading model... (this takes ~60 seconds, only happens once)")
 start = time.time()

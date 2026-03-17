@@ -7,25 +7,16 @@ const upload = multer();
 
 app.use(express.static("public"));
 
-const py = spawn("python", ["speech-server.py"]);
-
-py.stdout.on("data", (data) => {
-  console.log("PYTHON:", data.toString());
-});
-py.stderr.on("data", (data) => {
-  console.error("PYTHON ERR:", data.toString());
-});
-
 app.post("/audio", upload.single("audio"), (req, res) => {
   const audioBuffer = req.file.buffer;
 
-  // Convert WebM -> raw 16kHz mono PCM using ffmpeg
-  const ffmpeg = spawn("ffmpeg", [
-    "-i", "pipe:0",          // input from stdin
-    "-ar", "16000",          // 16kHz sample rate
-    "-ac", "1",              // mono
-    "-f", "s16le",           // raw PCM signed 16-bit little-endian
-    "pipe:1"                 // output to stdout
+  // Convert WebM -> raw PCM
+  const ffmpeg = spawn("C:\\ffmpeg\\bin\\ffmpeg.exe", [
+    "-i", "pipe:0",
+    "-ar", "16000",
+    "-ac", "1",
+    "-f", "s16le",
+    "pipe:1"
   ]);
 
   let pcmChunks = [];
@@ -34,16 +25,30 @@ app.post("/audio", upload.single("audio"), (req, res) => {
 
   ffmpeg.stdout.on("end", () => {
     const pcm = Buffer.concat(pcmChunks);
+
+    // Spawn a fresh Python process for each recording
+    const py = spawn("python", ["speech-server.py"]);
+
+    let result = "";
+
+    py.stdout.on("data", (data) => {
+      result += data.toString();
+      console.log("PYTHON:", data.toString());
+    });
+
+    py.stderr.on("data", () => {}); // suppress vosk logs
+
+    py.stdout.on("end", () => {
+      res.send(result.trim() || "No speech detected");
+    });
+
     py.stdin.write(pcm);
-    py.stdin.write(Buffer.alloc(8000)); // flush with silence
+    py.stdin.end();
   });
 
-  ffmpeg.stderr.on("data", () => {}); // suppress ffmpeg logs
-
+  ffmpeg.stderr.on("data", () => {});
   ffmpeg.stdin.write(audioBuffer);
   ffmpeg.stdin.end();
-
-  res.send("OK");
 });
 
 app.listen(3000, () => console.log("Running on http://localhost:3000"));
