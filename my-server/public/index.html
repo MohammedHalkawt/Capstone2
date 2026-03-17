@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h1>Speech Test</h1>
+<button onclick="startRecording()">🎤 Speak</button>
+
+<script>
+let mediaRecorder;
+let audioChunks = [];
+
+async function startRecording() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    mediaRecorder = new MediaRecorder(stream);
+
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+        audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunks);
+
+        const formData = new FormData();
+        formData.append("audio", blob);
+
+        await fetch("/audio", {
+            method: "POST",
+            body: formData
+        });
+
+        alert("Sent to server!");
+    };
+
+    mediaRecorder.start();
+
+    setTimeout(() => {
+        mediaRecorder.stop();
+    }, 3000); // record 3 seconds
+}
+</script>
+
+</body>
+</html>
