@@ -32,8 +32,11 @@ app.post("/audio", upload.single("audio"), (req, res) => {
     let result = "";
 
     py.stdout.on("data", (data) => {
-      result += data.toString();
-      console.log("PYTHON:", data.toString());
+      const text = data.toString().replace("FINAL:", "").trim();
+      console.log("PYTHON:", text);
+      
+      // Write to file for TTS
+      require("fs").writeFileSync("C:/Users/hama2/OneDrive/Documents/GitHub/Capstone2/TTS/input.txt", text);
     });
 
     py.stderr.on("data", () => {}); // suppress vosk logs
