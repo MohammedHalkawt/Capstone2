@@ -3,176 +3,608 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>JARVIS</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet" />
+  <title>JARVIS · kiosk + refined</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #060b12;
-      --surface: #0d1825;
-      --accent: #00d4ff;
-      --accent2: #0066ff;
-      --glow: rgba(0, 212, 255, 0.35);
-      --text: #c8e8f0;
-      --dim: #4a7a8a;
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --accent: #000000;
+      --text: #000000;
+      --dim: #444444;
+      --border: #000000;
+      font-size: 20px;
     }
     html, body {
-      height: 100%; background: var(--bg); color: var(--text);
-      font-family: 'Rajdhani', sans-serif; overflow: hidden;
-      -webkit-tap-highlight-color: transparent; user-select: none;
+      height: 100%; width: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden; 
+      -webkit-tap-highlight-color: transparent; 
+      user-select: none;
     }
-    body::before {
-      content: ''; position: fixed; inset: 0;
-      background-image: linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px; pointer-events: none; z-index: 0;
+
+    .page { 
+      position: fixed; inset: 0; z-index: 1; 
+      display: none; flex-direction: column; align-items: center; 
+      padding: 25px 16px; 
+      overflow: hidden; 
     }
-    .container {
-      position: relative; z-index: 1; height: 100vh;
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: space-between; padding: 48px 24px 60px;
+    .page.scrollable {
+      overflow-y: auto;
+      padding-top: 100px;
+      padding-bottom: 40px;
     }
-    .header { text-align: center; animation: fadeDown 0.8s ease both; }
-    .header h1 {
-      font-family: 'Orbitron', monospace; font-size: 2.8rem; font-weight: 900;
-      letter-spacing: 0.3em; color: var(--accent);
-      text-shadow: 0 0 30px var(--glow), 0 0 60px rgba(0,212,255,0.2);
+    .page.active { display: flex; animation: pageIn 0.25s ease both; }
+    @keyframes pageIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+    .back-btn {
+      position: fixed;
+      top: 20px; left: 20px;
+      z-index: 100;
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; border: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 24px;
+      color: var(--text); font-family: 'Rajdhani', sans-serif;
+      font-size: 1.6rem; font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
     }
-    .header p { font-size: 0.85rem; letter-spacing: 0.25em; color: var(--dim); margin-top: 6px; text-transform: uppercase; }
-    .status-panel {
-      width: 100%; max-width: 360px; background: var(--surface);
-      border: 1px solid rgba(0,212,255,0.15); border-radius: 12px;
-      padding: 16px 20px; animation: fadeUp 0.8s 0.2s ease both;
+    .back-btn:active { background: var(--accent); color: var(--bg); }
+    .back-btn svg { width: 30px; height: 30px; stroke-width: 2.2; }
+
+    .jarvis-title {
+      font-size: 5.2rem; font-weight: 700;
+      letter-spacing: 0.08em; color: var(--text);
+      text-align: center; margin-top: 30px; margin-bottom: 10px;
+      width: 100%;
     }
-    .status-label { font-size: 0.7rem; letter-spacing: 0.2em; color: var(--dim); text-transform: uppercase; margin-bottom: 8px; }
-    .status-text { font-size: 1rem; font-weight: 600; color: var(--text); min-height: 24px; transition: color 0.3s; }
-    .status-text.active { color: var(--accent); }
-    .status-text.processing { color: #ffaa00; }
-    .waveform { display: flex; align-items: center; justify-content: center; gap: 4px; height: 48px; margin-top: 12px; opacity: 0; transition: opacity 0.3s; }
+    .jarvis-sub { 
+      font-size: 1.5rem; letter-spacing: 0.25em; color: var(--dim); 
+      text-transform: uppercase; text-align: center; margin-bottom: 40px; 
+      width: 100%;
+    }
+
+    .menu-btn {
+      width: 90%; max-width: 420px;
+      display: flex; align-items: center; justify-content: center;
+      gap: 20px;
+      background: var(--bg); border: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 28px;
+      cursor: pointer; margin: 0 auto 18px auto;
+      transition: background 0.2s, color 0.2s;
+    }
+    .menu-btn:active { background: var(--accent); color: var(--bg); }
+    .menu-btn:active svg { color: var(--bg); }
+    .menu-btn svg { width: 44px; height: 44px; color: var(--text); flex-shrink: 0; }
+    .menu-btn-text { font-size: 2.2rem; font-weight: 700; color: var(--text); letter-spacing: 0.02em; }
+
+    .section-title {
+      font-size: 1.9rem; font-weight: 700;
+      color: var(--dim); letter-spacing: 0.15em; text-align: center;
+      margin-bottom: 30px; text-transform: uppercase; width: 100%;
+    }
+    
+    .lang-btn {
+      width: 90%; max-width: 460px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg); border: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 30px 20px;
+      cursor: pointer; margin: 0 auto 16px auto;
+      font-size: 2.4rem; font-weight: 700; color: var(--text); letter-spacing: 0.02em;
+      transition: background 0.2s, color 0.2s;
+    }
+    .lang-btn:active { background: var(--accent); color: var(--bg); }
+    .lang-btn span.sub { font-size: 1.5rem; color: var(--dim); margin-left: 15px; font-weight: 600; }
+
+    .faq-btn {
+      width: 90%; max-width: 500px;
+      background: var(--bg);
+      border: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 28px 24px;
+      cursor: pointer; margin: 0 auto 16px auto;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 2.0rem; font-weight: 700;
+      color: var(--text); text-align: center; line-height: 1.3;
+      transition: background 0.2s, color 0.2s;
+    }
+    .faq-btn:active { background: var(--accent); color: var(--bg); }
+
+    .faq-answer-box {
+      width: 90%; max-width: 560px;
+      background: var(--bg);
+      border: 3px solid var(--border);
+      border-radius: 12px;
+      padding: 40px 30px;
+      text-align: center;
+      margin: 0 auto;
+    }
+    .faq-q {
+      font-size: 2.4rem; font-weight: 700;
+      color: var(--text); margin-bottom: 30px;
+      line-height: 1.4; border-bottom: 2px solid var(--border);
+      padding-bottom: 20px;
+    }
+    .faq-a {
+      font-size: 1.9rem; font-weight: 600;
+      color: var(--dim); line-height: 1.6;
+    }
+
+    .search-row {
+      display: flex; gap: 10px;
+      width: 90%; max-width: 560px;
+      margin-bottom: 15px;
+    }
+    .search-wrap { flex: 1; position: relative; }
+    .search-input {
+      width: 100%; background: var(--bg); border: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 20px 22px 60px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.5rem; font-weight: 600;
+      color: var(--text); outline: none;
+    }
+    .search-input::placeholder { color: var(--dim); font-size: 1.4rem; }
+    .search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--text); }
+    .search-icon svg { width: 32px; height: 32px; }
+    .search-btn {
+      background: var(--bg); border: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 0 28px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.6rem; font-weight: 700;
+      color: var(--text); cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+    .search-btn:active { background: var(--accent); color: var(--bg); }
+
+    .simple-keyboard {
+      width: 100%;
+      margin: 5px 0 15px 0;
+      border: 3px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      padding: 16px 8px;
+      display: none;
+    }
+    .simple-keyboard.show { display: block; }
+    .kb-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+      gap: 8px;
+    }
+    .kb-key {
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 0;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+      flex: 1 1 0px;
+      min-width: 40px;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .kb-key:active { background: var(--accent); color: var(--bg); }
+    .kb-key.special { flex: 1.8; font-size: 1.6rem; }
+    .kb-key.space { flex: 5; text-transform: uppercase; }
+    .kb-key svg { width: 32px; height: 32px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+    .prof-row {
+      width: 90%; max-width: 560px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg); border: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 28px;
+      margin: 0 auto 14px auto;
+    }
+    .prof-name { font-size: 1.7rem; font-weight: 700; color: var(--text); }
+    .prof-room { font-size: 1.6rem; font-weight: 700; color: var(--text); border: 2px solid var(--border); padding: 6px 14px; border-radius: 8px; }
+
+    .jarvis-page-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      flex: 1; width: 100%;
+    }
+    .jarvis-mic-btn {
+      position: relative;
+      width: 220px; height: 220px;
+      border-radius: 50%;
+      border: 4px solid var(--border);
+      background: var(--bg);
+      cursor: pointer; outline: none;
+      transition: transform 0.15s, background 0.2s;
+      margin-bottom: 40px;
+    }
+    .jarvis-mic-btn:active { background: var(--accent); }
+    .jarvis-mic-btn:active svg { color: var(--bg); }
+    .jarvis-mic-btn::after {
+      content: ''; position: absolute; inset: -20px; border-radius: 50%;
+      border: 2px solid var(--border); opacity: 0;
+    }
+    .jarvis-mic-btn.recording::after { opacity: 1; animation: pulse-ring 1.5s ease-in-out infinite; }
+    .jarvis-mic-btn.recording { background: var(--accent); border-color: var(--accent); }
+    .jarvis-mic-btn.recording svg { color: var(--bg); }
+    @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.3); opacity: 0; } }
+    .jarvis-mic-icon { 
+      width: 90px; height: 90px; 
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      color: var(--text); pointer-events: none; 
+    }
+    .jarvis-status-box {
+      background: transparent; border: 3px solid var(--border);
+      border-radius: 16px; padding: 24px 60px;
+      text-align: center; min-width: 280px;
+    }
+    .jarvis-status { font-size: 2.0rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text); }
+    .waveform { display: flex; align-items: center; justify-content: center; gap: 6px; height: 42px; margin-top: 15px; opacity: 0; transition: opacity 0.3s; }
     .waveform.visible { opacity: 1; }
-    .bar { width: 4px; background: var(--accent); border-radius: 2px; height: 6px; }
-    .waveform.visible .bar:nth-child(1) { animation: wave 0.8s 0.0s ease-in-out infinite alternate; }
-    .waveform.visible .bar:nth-child(2) { animation: wave 0.8s 0.1s ease-in-out infinite alternate; }
-    .waveform.visible .bar:nth-child(3) { animation: wave 0.8s 0.2s ease-in-out infinite alternate; }
-    .waveform.visible .bar:nth-child(4) { animation: wave 0.8s 0.05s ease-in-out infinite alternate; }
-    .waveform.visible .bar:nth-child(5) { animation: wave 0.8s 0.15s ease-in-out infinite alternate; }
-    .waveform.visible .bar:nth-child(6) { animation: wave 0.8s 0.25s ease-in-out infinite alternate; }
-    .waveform.visible .bar:nth-child(7) { animation: wave 0.8s 0.08s ease-in-out infinite alternate; }
-    .waveform.visible .bar:nth-child(8) { animation: wave 0.8s 0.18s ease-in-out infinite alternate; }
+    .bar { width: 6px; background: var(--text); border-radius: 2px; height: 6px; }
+    .waveform.visible .bar { animation: wave 0.8s ease-in-out infinite alternate; }
+    .waveform.visible .bar:nth-child(1) { animation-delay: 0.0s; }
+    .waveform.visible .bar:nth-child(2) { animation-delay: 0.1s; }
+    .waveform.visible .bar:nth-child(3) { animation-delay: 0.2s; }
+    .waveform.visible .bar:nth-child(4) { animation-delay: 0.3s; }
+    .waveform.visible .bar:nth-child(5) { animation-delay: 0.4s; }
+    .waveform.visible .bar:nth-child(6) { animation-delay: 0.5s; }
+    .waveform.visible .bar:nth-child(7) { animation-delay: 0.6s; }
+    .waveform.visible .bar:nth-child(8) { animation-delay: 0.7s; }
     @keyframes wave { from { height: 6px; } to { height: 36px; } }
-    .btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 20px; animation: fadeUp 0.8s 0.4s ease both; }
-    .mic-btn {
-      position: relative; width: 160px; height: 160px; border-radius: 50%;
-      border: none; background: var(--surface); cursor: pointer; outline: none;
-      -webkit-tap-highlight-color: transparent; transition: transform 0.15s;
-    }
-    .mic-btn::before {
-      content: ''; position: absolute; inset: -3px; border-radius: 50%;
-      background: conic-gradient(var(--accent), var(--accent2), var(--accent));
-      z-index: -1; transition: opacity 0.3s; opacity: 0.6;
-    }
-    .mic-btn::after {
-      content: ''; position: absolute; inset: -16px; border-radius: 50%;
-      border: 2px solid var(--accent); opacity: 0; transition: opacity 0.3s;
-    }
-    .mic-btn.recording::after { opacity: 0.4; animation: pulse-ring 1s ease-in-out infinite; }
-    .mic-btn.recording::before { opacity: 1; }
-    .mic-btn.recording { transform: scale(1.06); background: #0a1e30; }
-    @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.4; } 100% { transform: scale(1.3); opacity: 0; } }
-    .mic-icon { font-size: 3.2rem; pointer-events: none; transition: transform 0.15s; display: block; line-height: 160px; text-align: center; }
-    .mic-btn.recording .mic-icon { transform: scale(1.1); }
-    .btn-hint { font-size: 0.8rem; letter-spacing: 0.15em; color: var(--dim); text-transform: uppercase; text-align: center; }
-    .result-panel { width: 100%; max-width: 360px; animation: fadeUp 0.8s 0.6s ease both; }
-    .result-label { font-size: 0.7rem; letter-spacing: 0.2em; color: var(--dim); text-transform: uppercase; margin-bottom: 8px; }
-    .result-text { font-size: 1.1rem; font-weight: 600; color: var(--accent); min-height: 28px; text-shadow: 0 0 20px rgba(0,212,255,0.4); }
-    @keyframes fadeDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .lang-vertical { flex:1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>JARVIS</h1>
-      <p>Voice Interface System</p>
+
+<!-- HOME PAGE -->
+<div class="page active" id="page-home">
+  <div class="jarvis-title">JARVIS</div>
+  <div class="jarvis-sub">Kiosk Interface</div>
+
+  <button class="menu-btn" onclick="go('page-faq-lang')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.5 9.5a3 3 0 1 1 3 3v1.5"/>
+      <circle cx="12" cy="17.5" r="0.5" fill="currentColor"/>
+    </svg>
+    <span class="menu-btn-text">FAQ</span>
+  </button>
+
+  <button class="menu-btn" onclick="go('page-offices')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <span class="menu-btn-text">Offices</span>
+  </button>
+
+  <button class="menu-btn" onclick="go('page-jarvis')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    <span class="menu-btn-text">Assistant</span>
+  </button>
+</div>
+
+<!-- FAQ LANGUAGE SELECT -->
+<div class="page" id="page-faq-lang">
+  <button class="back-btn" onclick="go('page-home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </button>
+  <div class="lang-vertical">
+    <div class="section-title">SELECT LANGUAGE</div>
+    <button class="lang-btn" onclick="setLang('en'); go('page-faq-list')">English</button>
+    <button class="lang-btn" onclick="setLang('ku'); go('page-faq-list')">کوردی <span class="sub">Kurdish</span></button>
+    <button class="lang-btn" onclick="setLang('ar'); go('page-faq-list')">العربية <span class="sub">Arabic</span></button>
+  </div>
+</div>
+
+<!-- FAQ LIST -->
+<div class="page scrollable" id="page-faq-list">
+  <button class="back-btn" onclick="go('page-faq-lang')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </button>
+  <div class="section-title" id="faq-list-title">FAQ</div>
+  <div id="faq-questions-container" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
+</div>
+
+<!-- FAQ ANSWER -->
+<div class="page scrollable" id="page-faq-answer">
+  <button class="back-btn" onclick="go('page-faq-list')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </button>
+  <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; width:100%;">
+    <div class="faq-answer-box" id="faq-answer-box">
+      <div class="faq-q" id="faq-answer-q"></div>
+      <div class="faq-a" id="faq-answer-a"></div>
     </div>
-    <div class="status-panel">
-      <div class="status-label">System Status</div>
-      <div class="status-text" id="statusText">Ready</div>
+  </div>
+</div>
+
+<!-- OFFICES -->
+<div class="page scrollable" id="page-offices">
+  <button class="back-btn" onclick="go('page-home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </button>
+  <div class="section-title">OFFICES</div>
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+      <input class="search-input" id="search-input" type="text" placeholder="Search..." autocomplete="off" readonly>
+    </div>
+    <button class="search-btn" id="search-btn">Search</button>
+  </div>
+  <div class="simple-keyboard" id="keyboard-container"></div>
+  <div id="prof-list" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
+</div>
+
+<!-- JARVIS AI -->
+<div class="page" id="page-jarvis">
+  <button class="back-btn" onclick="go('page-home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    Back
+  </button>
+  <div class="jarvis-page-wrap">
+    <div class="jarvis-title" style="font-size:4rem; margin-top:0;">AI</div>
+    <button class="jarvis-mic-btn" id="micBtn">
+      <svg class="jarvis-mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <div class="jarvis-status-box">
+      <div class="jarvis-status" id="jarvisStatus">Ready</div>
       <div class="waveform" id="waveform">
         <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
         <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
       </div>
     </div>
-    <div class="btn-wrap">
-      <button class="mic-btn" id="micBtn">
-        <span class="mic-icon">🎙️</span>
-      </button>
-      <div class="btn-hint">Hold to speak</div>
-    </div>
-    <div class="result-panel">
-      <div class="result-label">Last Command</div>
-      <div class="result-text" id="resultText">—</div>
-    </div>
   </div>
-  <script>
-    let mediaRecorder, audioChunks = [], isRecording = false;
-    const btn = document.getElementById('micBtn');
-    const statusText = document.getElementById('statusText');
-    const resultText = document.getElementById('resultText');
-    const waveform = document.getElementById('waveform');
+</div>
 
-    function setStatus(text, cls) {
-      statusText.textContent = text;
-      statusText.className = 'status-text ' + (cls || '');
-    }
+<script>
+function go(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  if (pageId !== 'page-offices') hideKeyboard();
+}
 
-    async function startRecording() {
-      if (isRecording) return;
-      isRecording = true;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = async () => {
-          setStatus('Processing...', 'processing');
-          waveform.classList.remove('visible');
-          const blob = new Blob(audioChunks);
-          const formData = new FormData();
-          formData.append('audio', blob);
-          try {
-            const res = await fetch('/audio', { method: 'POST', body: formData });
-            const text = await res.text();
-            if (text && text !== 'No speech detected') {
-              resultText.textContent = text.replace('FINAL:', '').trim();
-            }
-          } catch(e) { setStatus('Error', ''); }
-          setStatus('Ready', '');
-          isRecording = false;
-          stream.getTracks().forEach(t => t.stop());
-        };
-        mediaRecorder.start();
-        btn.classList.add('recording');
-        waveform.classList.add('visible');
-        setStatus('Listening...', 'active');
-      } catch(e) {
-        setStatus('Mic access denied', '');
-        isRecording = false;
+const faqs = {
+  en: [
+    { q: "What are the office hours?", a: "Office hours are Sunday to Thursday, 8:00 AM to 4:00 PM. Some departments may have extended hours." },
+    { q: "How do I register for courses?", a: "Log in to the student portal, navigate to 'Course Registration', select your desired courses and confirm enrollment before the deadline." },
+    { q: "Where can I find the class schedule?", a: "Class schedules are available on the student portal under 'Academic Schedule'. You can also request a printed copy from the registrar." },
+    { q: "How do I apply for a scholarship?", a: "Visit the Financial Aid office or log in to the portal and go to 'Scholarships & Aid'. Fill out the application form and submit required documents." },
+    { q: "How do I drop a course?", a: "To drop a course, visit the registrar's office or use the student portal during the official drop/add period. Deadlines apply." },
+    { q: "How can I contact my professor?", a: "Professor contact details are listed in the course syllabus and on the university directory. You can also visit during office hours." },
+    { q: "Where is the library?", a: "The library is located in Building C, Ground Floor. It is open Sunday to Thursday from 8:00 AM to 8:00 PM." },
+    { q: "How do I reset my password?", a: "Go to the login page and click 'Forgot Password'. Enter your student email and follow the instructions sent to your inbox." },
+    { q: "Where is the IT help desk?", a: "The IT Help Desk is in Building A, Room 105. You can also reach them at it-support@university.edu or call extension 1200." },
+    { q: "How do I get a student ID card?", a: "Visit the Student Affairs office in Building B with your enrollment confirmation and a passport-size photo to receive your ID card." }
+  ],
+  ku: [
+    { q: "کاتی ئۆفیسەکان کەیە؟", a: "کاتی ئۆفیسەکان لە یەکشەممە تا پێنجشەممەیە، لە ساعت ٨ی بەیانی تا ٤ی ئێوارە. هەندێ بەش دەتوانێت کاتی درێژتری هەبێت." },
+    { q: "چۆن تۆمار بۆ وانەکان دەکەم؟", a: "چوونە ناو پۆرتاڵی خوێندکاری، بڕۆ بۆ 'تۆمارکردنی وانە'، وانەکانی دڵخوازت هەڵبژێرە و پێش کۆتایی مۆهلەتەکە پشتڕاستی بکەرەوە." },
+    { q: "کوێ دەتوانم خشتەی وانەکان بدۆزمەوە؟", a: "خشتەی وانەکان لە پۆرتاڵی خوێندکاری بەرپرس بەشی 'خشتەی خوێندن' دەردەکەوێت." },
+    { q: "چۆن داواکاری بەرسیوی بکەم؟", a: "سەردانی ئۆفیسی یارمەتی دارایی بکە یان بچووە پۆرتاڵ و بڕۆ بۆ 'بەرسیو و یارمەتی دارایی'." },
+    { q: "چۆن وانەیەک دەدەمەوە؟", a: "بۆ دانەوەی وانەیەک، سەردانی ئۆفیسی تۆمار بکە یان لەماوەی مۆهلەتی فەرمی زیادکردن/دانەوەدا پۆرتاڵی خوێندکاری بەکاربهێنە." },
+    { q: "چۆن پەیوەندی بە مامۆستام بکەم؟", a: "زانیاری پەیوەندی مامۆستاکان لە پلانی وانەکە و لە لیستی زانکۆ هەیە." },
+    { q: "کتێبخانەکە کوێیە؟", a: "کتێبخانەکە لە بینای C، نەخشەی یەکەمە. کاتی کردنەوەی لە یەکشەممە تا پێنجشەممەیە لە ساعت ٨ی بەیانی تا ٨ی شەو." },
+    { q: "چۆن پاسوۆردەکەم ریسێت دەکەم؟", a: "بڕۆ بۆ لاپەڕەی چوونەژوورەوە و کلیک لەسەر 'پاسوۆردم بیرم چووە' بکە." },
+    { q: "میزی یارمەتی IT کوێیە؟", a: "میزی یارمەتی IT لە بینای A، ژووری ١٠٥یە." },
+    { q: "چۆن کارتی ناسنامەی خوێندکاریم وەردەگرم؟", a: "سەردانی ئۆفیسی چارەنووسی خوێندکاران لە بینای B بکە و پشتڕاستکردنەوەی تۆمارکردن و وێنەیەکی پاسپۆرتی لەگەل خۆت بهێنە." }
+  ],
+  ar: [
+    { q: "ما هي ساعات العمل؟", a: "ساعات العمل من الأحد إلى الخميس، من الساعة 8 صباحاً حتى 4 مساءً." },
+    { q: "كيف أسجّل في المقررات الدراسية؟", a: "سجّل الدخول إلى بوابة الطالب، انتقل إلى 'تسجيل المقررات'، اختر المقررات المطلوبة وأكّد التسجيل قبل انتهاء الموعد النهائي." },
+    { q: "أين أجد الجدول الدراسي؟", a: "الجداول الدراسية متاحة في بوابة الطالب تحت 'الجدول الأكاديمي'." },
+    { q: "كيف أتقدم للحصول على منحة دراسية؟", a: "زر مكتب المساعدات المالية أو ادخل إلى البوابة وانتقل إلى 'المنح والمساعدات'." },
+    { q: "كيف أسحب مقرراً دراسياً؟", a: "لسحب مقرر، زر مكتب التسجيل أو استخدم بوابة الطالب خلال فترة الإضافة والحذف الرسمية." },
+    { q: "كيف أتواصل مع أستاذي؟", a: "بيانات التواصل مع الأساتذة مدرجة في خطة المقرر وفي دليل الجامعة." },
+    { q: "أين تقع المكتبة؟", a: "تقع المكتبة في المبنى C، الطابق الأرضي. تعمل من الأحد إلى الخميس من 8 صباحاً حتى 8 مساءً." },
+    { q: "كيف أعيد تعيين كلمة المرور؟", a: "انتقل إلى صفحة تسجيل الدخول وانقر على 'نسيت كلمة المرور' واتبع التعليمات." },
+    { q: "أين مكتب الدعم التقني؟", a: "مكتب الدعم التقني في المبنى A، غرفة 105." },
+    { q: "كيف أحصل على بطاقة هوية الطالب؟", a: "زر مكتب شؤون الطلاب في المبنى B مع تأكيد التسجيل وصورة بحجم جواز السفر." }
+  ]
+};
+
+let currentLang = 'en';
+
+function setLang(lang) {
+  currentLang = lang;
+  const titles = { en: 'FAQ', ku: 'پرسیارە باوەکان', ar: 'الأسئلة الشائعة' };
+  document.getElementById('faq-list-title').textContent = titles[lang];
+  const dir = (lang === 'ar' || lang === 'ku') ? 'rtl' : 'ltr';
+  const container = document.getElementById('faq-questions-container');
+  container.innerHTML = '';
+  faqs[lang].forEach((item, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'faq-btn';
+    btn.setAttribute('dir', dir);
+    btn.textContent = item.q;
+    btn.onclick = () => {
+      const d = (currentLang === 'ar' || currentLang === 'ku') ? 'rtl' : 'ltr';
+      document.getElementById('faq-answer-box').setAttribute('dir', d);
+      document.getElementById('faq-answer-q').textContent = item.q;
+      document.getElementById('faq-answer-a').textContent = item.a;
+      go('page-faq-answer');
+    };
+    container.appendChild(btn);
+  });
+}
+
+const professors = [
+  { name: "Dr. Ahmed Hassan", room: "A-201" }, { name: "Dr. Sara Mohammed", room: "B-105" },
+  { name: "Prof. Karwan Jalal", room: "C-302" }, { name: "Dr. Layla Ibrahim", room: "A-114" },
+  { name: "Prof. Omar Aziz", room: "B-210" }, { name: "Dr. Nadia Saleh", room: "C-118" },
+  { name: "Prof. Hiwa Mustafa", room: "A-305" }, { name: "Dr. Rania Khalid", room: "B-202" },
+  { name: "Prof. Dara Rashid", room: "C-401" }, { name: "Dr. Zainab Ali", room: "A-109" },
+  { name: "Prof. Soran Tahir", room: "B-315" }, { name: "Dr. Maryam Farouk", room: "C-220" },
+  { name: "Prof. Rebaz Hama", room: "A-412" }, { name: "Dr. Yasmin Nouri", room: "B-108" },
+  { name: "Prof. Bahez Karim", room: "C-310" }
+];
+
+function renderProfs(list) {
+  const container = document.getElementById('prof-list');
+  container.innerHTML = '';
+  list.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'prof-row';
+    row.innerHTML = `<span class="prof-name">${p.name}</span><span class="prof-room">${p.room}</span>`;
+    container.appendChild(row);
+  });
+}
+
+function filterProfs() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  renderProfs(professors.filter(p => p.name.toLowerCase().includes(q)));
+}
+
+// ── KEYBOARD ──
+// FIX: track whether keyboard should stay open
+let keyboardLocked = false;
+
+const keyboardContainer = document.getElementById('keyboard-container');
+const searchInput = document.getElementById('search-input');
+const searchBtn = document.getElementById('search-btn');
+
+const backspaceIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>`;
+const searchIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
+
+const keyRows = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L'],
+  ['Z','X','C','V','B','N','M'],
+  ['BACKSPACE','SPACE','SEARCH']
+];
+
+function buildKeyboard() {
+  let html = '';
+  keyRows.forEach(row => {
+    html += '<div class="kb-row">';
+    row.forEach(key => {
+      let cls = 'kb-key';
+      let content = key;
+      if (key === 'BACKSPACE') { cls += ' special'; content = backspaceIcon; }
+      else if (key === 'SEARCH') { cls += ' special'; content = searchIconSvg; }
+      else if (key === 'SPACE') { cls += ' space'; content = '␣'; }
+      html += `<div class="${cls}" data-key="${key}">${content}</div>`;
+    });
+    html += '</div>';
+  });
+  keyboardContainer.innerHTML = html;
+
+  document.querySelectorAll('.kb-key').forEach(kb => {
+    kb.addEventListener('mousedown', e => e.preventDefault()); // prevent input blur
+    kb.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = kb.dataset.key;
+      if (!key) return;
+
+      if (key === 'BACKSPACE') {
+        searchInput.value = searchInput.value.slice(0, -1);
+        filterProfs();
+      } else if (key === 'SPACE') {
+        searchInput.value += ' ';
+        filterProfs();
+      } else if (key === 'SEARCH') {
+        // FIX: hide keyboard and DON'T refocus input
+        filterProfs();
+        keyboardLocked = false;
+        hideKeyboard();
+      } else {
+        searchInput.value += key;
+        filterProfs();
       }
-    }
+    });
+  });
+}
 
-    function stopRecording() {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        btn.classList.remove('recording');
-      }
-    }
+function showKeyboard() {
+  keyboardLocked = true;
+  keyboardContainer.classList.add('show');
+}
 
-    btn.addEventListener('mousedown', startRecording);
-    btn.addEventListener('mouseup', stopRecording);
-    btn.addEventListener('mouseleave', stopRecording);
-    btn.addEventListener('touchstart', e => { e.preventDefault(); startRecording(); }, { passive: false });
-    btn.addEventListener('touchend', e => { e.preventDefault(); stopRecording(); }, { passive: false });
-    btn.addEventListener('touchcancel', e => { e.preventDefault(); stopRecording(); }, { passive: false });
-  </script>
+function hideKeyboard() {
+  keyboardLocked = false;
+  keyboardContainer.classList.remove('show');
+}
+
+// Show keyboard when search bar is tapped (but input is readonly so no system keyboard)
+searchInput.addEventListener('click', () => { showKeyboard(); });
+searchInput.addEventListener('touchstart', e => { e.preventDefault(); showKeyboard(); }, { passive: false });
+
+// Search button hides keyboard and filters
+searchBtn.addEventListener('mousedown', e => e.preventDefault());
+searchBtn.addEventListener('click', () => { filterProfs(); hideKeyboard(); });
+
+// Click outside hides keyboard
+document.addEventListener('click', (e) => {
+  if (!searchInput.contains(e.target) &&
+      !keyboardContainer.contains(e.target) &&
+      !searchBtn.contains(e.target)) {
+    hideKeyboard();
+  }
+});
+
+// ── JARVIS MIC ──
+let mediaRecorder, audioChunks = [], isRecording = false;
+const micBtn = document.getElementById('micBtn');
+const jarvisStatus = document.getElementById('jarvisStatus');
+const waveform = document.getElementById('waveform');
+
+function setJarvisStatus(text) { jarvisStatus.textContent = text; }
+
+async function startRecording() {
+  if (isRecording) return;
+  isRecording = true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      setJarvisStatus('Processing...');
+      waveform.classList.remove('visible');
+      micBtn.classList.remove('recording');
+      const blob = new Blob(audioChunks);
+      const formData = new FormData();
+      formData.append('audio', blob);
+      try { await fetch('/audio', { method: 'POST', body: formData }); } catch(e) { setJarvisStatus('Error'); }
+      setJarvisStatus('Ready');
+      isRecording = false;
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.start();
+    micBtn.classList.add('recording');
+    waveform.classList.add('visible');
+    setJarvisStatus('Listening...');
+  } catch(e) { setJarvisStatus('Mic Denied'); isRecording = false; }
+}
+
+function stopRecording() { if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop(); }
+
+micBtn.addEventListener('mousedown', startRecording);
+micBtn.addEventListener('mouseup', stopRecording);
+micBtn.addEventListener('mouseleave', stopRecording);
+micBtn.addEventListener('touchstart', e => { e.preventDefault(); startRecording(); }, { passive: false });
+micBtn.addEventListener('touchend', e => { e.preventDefault(); stopRecording(); }, { passive: false });
+micBtn.addEventListener('touchcancel', e => { e.preventDefault(); stopRecording(); }, { passive: false });
+
+setLang('en');
+renderProfs(professors);
+buildKeyboard();
+hideKeyboard();
+</script>
 </body>
 </html>
