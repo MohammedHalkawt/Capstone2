@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>JARVIS · kiosk + refined</title>
+  <title>JARVIS · Kiosk with Fullscreen Lock</title>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -61,7 +61,10 @@
       letter-spacing: 0.08em; color: var(--text);
       text-align: center; margin-top: 30px; margin-bottom: 10px;
       width: 100%;
+      cursor: pointer;
+      transition: transform 0.1s ease;
     }
+    .jarvis-title:active { transform: scale(0.98); }
     .jarvis-sub { 
       font-size: 1.5rem; letter-spacing: 0.25em; color: var(--dim); 
       text-transform: uppercase; text-align: center; margin-bottom: 40px; 
@@ -265,16 +268,23 @@
     .waveform.visible .bar:nth-child(8) { animation-delay: 0.7s; }
     @keyframes wave { from { height: 6px; } to { height: 36px; } }
     .lang-vertical { flex:1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
+
+    .loader {
+      text-align: center;
+      font-size: 1.5rem;
+      color: var(--dim);
+      margin-top: 40px;
+    }
   </style>
 </head>
 <body>
 
 <!-- HOME PAGE -->
 <div class="page active" id="page-home">
-  <div class="jarvis-title">JARVIS</div>
+  <div class="jarvis-title" id="jarvisTitle">JARVIS</div>
   <div class="jarvis-sub">Kiosk Interface</div>
 
-  <button class="menu-btn" onclick="go('page-faq-lang')">
+  <button class="menu-btn" onclick="goToPage('page-faq-lang')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <circle cx="12" cy="12" r="10"/>
       <path d="M9.5 9.5a3 3 0 1 1 3 3v1.5"/>
@@ -283,12 +293,12 @@
     <span class="menu-btn-text">FAQ</span>
   </button>
 
-  <button class="menu-btn" onclick="go('page-offices')">
+  <button class="menu-btn" onclick="goToPage('page-offices')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
     <span class="menu-btn-text">Offices</span>
   </button>
 
-  <button class="menu-btn" onclick="go('page-jarvis')">
+  <button class="menu-btn" onclick="goToPage('page-jarvis')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
     <span class="menu-btn-text">Assistant</span>
   </button>
@@ -296,45 +306,45 @@
 
 <!-- FAQ LANGUAGE SELECT -->
 <div class="page" id="page-faq-lang">
-  <button class="back-btn" onclick="go('page-home')">
+  <button class="back-btn" onclick="goToPage('page-home')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     Back
   </button>
   <div class="lang-vertical">
     <div class="section-title">SELECT LANGUAGE</div>
-    <button class="lang-btn" onclick="setLang('en'); go('page-faq-list')">English</button>
-    <button class="lang-btn" onclick="setLang('ku'); go('page-faq-list')">کوردی <span class="sub">Kurdish</span></button>
-    <button class="lang-btn" onclick="setLang('ar'); go('page-faq-list')">العربية <span class="sub">Arabic</span></button>
+    <button class="lang-btn" onclick="setLanguage('en'); goToPage('page-faq-list')">English</button>
+    <button class="lang-btn" onclick="setLanguage('ku'); goToPage('page-faq-list')">کوردی <span class="sub">Kurdish</span></button>
+    <button class="lang-btn" onclick="setLanguage('ar'); goToPage('page-faq-list')">العربية <span class="sub">Arabic</span></button>
   </div>
 </div>
 
 <!-- FAQ LIST -->
 <div class="page scrollable" id="page-faq-list">
-  <button class="back-btn" onclick="go('page-faq-lang')">
+  <button class="back-btn" onclick="goToPage('page-faq-lang')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     Back
   </button>
-  <div class="section-title" id="faq-list-title">FAQ</div>
-  <div id="faq-questions-container" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
+  <div class="section-title" id="faqListTitle">FAQ</div>
+  <div id="faqQuestionsContainer" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
 </div>
 
 <!-- FAQ ANSWER -->
 <div class="page scrollable" id="page-faq-answer">
-  <button class="back-btn" onclick="go('page-faq-list')">
+  <button class="back-btn" onclick="goToPage('page-faq-list')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     Back
   </button>
   <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; width:100%;">
-    <div class="faq-answer-box" id="faq-answer-box">
-      <div class="faq-q" id="faq-answer-q"></div>
-      <div class="faq-a" id="faq-answer-a"></div>
+    <div class="faq-answer-box" id="faqAnswerBox">
+      <div class="faq-q" id="faqAnswerQuestion"></div>
+      <div class="faq-a" id="faqAnswerText"></div>
     </div>
   </div>
 </div>
 
-<!-- OFFICES -->
+<!-- OFFICES (Google Sheets powered) -->
 <div class="page scrollable" id="page-offices">
-  <button class="back-btn" onclick="go('page-home')">
+  <button class="back-btn" onclick="goToPage('page-home')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     Back
   </button>
@@ -342,27 +352,29 @@
   <div class="search-row">
     <div class="search-wrap">
       <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-      <input class="search-input" id="search-input" type="text" placeholder="Search..." autocomplete="off" readonly>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search..." autocomplete="off" readonly>
     </div>
-    <button class="search-btn" id="search-btn">Search</button>
+    <button class="search-btn" id="searchButton">Search</button>
   </div>
-  <div class="simple-keyboard" id="keyboard-container"></div>
-  <div id="prof-list" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
+  <div class="simple-keyboard" id="keyboardContainer"></div>
+  <div id="officeListContainer" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+    <div class="loader">Loading offices...</div>
+  </div>
 </div>
 
-<!-- JARVIS AI -->
+<!-- JARVIS AI (original server-based voice) -->
 <div class="page" id="page-jarvis">
-  <button class="back-btn" onclick="go('page-home')">
+  <button class="back-btn" onclick="goToPage('page-home')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     Back
   </button>
   <div class="jarvis-page-wrap">
     <div class="jarvis-title" style="font-size:4rem; margin-top:0;">AI</div>
-    <button class="jarvis-mic-btn" id="micBtn">
+    <button class="jarvis-mic-btn" id="micButton">
       <svg class="jarvis-mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
     </button>
     <div class="jarvis-status-box">
-      <div class="jarvis-status" id="jarvisStatus">Ready</div>
+      <div class="jarvis-status" id="jarvisStatusText">Ready</div>
       <div class="waveform" id="waveform">
         <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
         <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
@@ -372,239 +384,326 @@
 </div>
 
 <script>
-function go(pageId) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(pageId).classList.add('active');
-  if (pageId !== 'page-offices') hideKeyboard();
-}
+  const FULLSCREEN_EXIT_TAPS = 25;
+  const OFFICES_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTl2ae_I6i3rPM09ELaYVfsfZ6G54xvQmN3-xMrr-AvN2W18zuULSG217N4QjNX6uDlpJLGz6fHEJcj/pub?output=csv";
+  const FAQ_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShnUz-r7psqJ1eTeBKjsT6uwD5pguKVH7QDx_blm0xQWBPwHCJX4zo8LB5LIOLNyPmLud4woHyUFZq/pub?output=csv";
 
-const faqs = {
-  en: [
-    { q: "What are the office hours?", a: "Office hours are Sunday to Thursday, 8:00 AM to 4:00 PM. Some departments may have extended hours." },
-    { q: "How do I register for courses?", a: "Log in to the student portal, navigate to 'Course Registration', select your desired courses and confirm enrollment before the deadline." },
-    { q: "Where can I find the class schedule?", a: "Class schedules are available on the student portal under 'Academic Schedule'. You can also request a printed copy from the registrar." },
-    { q: "How do I apply for a scholarship?", a: "Visit the Financial Aid office or log in to the portal and go to 'Scholarships & Aid'. Fill out the application form and submit required documents." },
-    { q: "How do I drop a course?", a: "To drop a course, visit the registrar's office or use the student portal during the official drop/add period. Deadlines apply." },
-    { q: "How can I contact my professor?", a: "Professor contact details are listed in the course syllabus and on the university directory. You can also visit during office hours." },
-    { q: "Where is the library?", a: "The library is located in Building C, Ground Floor. It is open Sunday to Thursday from 8:00 AM to 8:00 PM." },
-    { q: "How do I reset my password?", a: "Go to the login page and click 'Forgot Password'. Enter your student email and follow the instructions sent to your inbox." },
-    { q: "Where is the IT help desk?", a: "The IT Help Desk is in Building A, Room 105. You can also reach them at it-support@university.edu or call extension 1200." },
-    { q: "How do I get a student ID card?", a: "Visit the Student Affairs office in Building B with your enrollment confirmation and a passport-size photo to receive your ID card." }
-  ],
-  ku: [
-    { q: "کاتی ئۆفیسەکان کەیە؟", a: "کاتی ئۆفیسەکان لە یەکشەممە تا پێنجشەممەیە، لە ساعت ٨ی بەیانی تا ٤ی ئێوارە. هەندێ بەش دەتوانێت کاتی درێژتری هەبێت." },
-    { q: "چۆن تۆمار بۆ وانەکان دەکەم؟", a: "چوونە ناو پۆرتاڵی خوێندکاری، بڕۆ بۆ 'تۆمارکردنی وانە'، وانەکانی دڵخوازت هەڵبژێرە و پێش کۆتایی مۆهلەتەکە پشتڕاستی بکەرەوە." },
-    { q: "کوێ دەتوانم خشتەی وانەکان بدۆزمەوە؟", a: "خشتەی وانەکان لە پۆرتاڵی خوێندکاری بەرپرس بەشی 'خشتەی خوێندن' دەردەکەوێت." },
-    { q: "چۆن داواکاری بەرسیوی بکەم؟", a: "سەردانی ئۆفیسی یارمەتی دارایی بکە یان بچووە پۆرتاڵ و بڕۆ بۆ 'بەرسیو و یارمەتی دارایی'." },
-    { q: "چۆن وانەیەک دەدەمەوە؟", a: "بۆ دانەوەی وانەیەک، سەردانی ئۆفیسی تۆمار بکە یان لەماوەی مۆهلەتی فەرمی زیادکردن/دانەوەدا پۆرتاڵی خوێندکاری بەکاربهێنە." },
-    { q: "چۆن پەیوەندی بە مامۆستام بکەم؟", a: "زانیاری پەیوەندی مامۆستاکان لە پلانی وانەکە و لە لیستی زانکۆ هەیە." },
-    { q: "کتێبخانەکە کوێیە؟", a: "کتێبخانەکە لە بینای C، نەخشەی یەکەمە. کاتی کردنەوەی لە یەکشەممە تا پێنجشەممەیە لە ساعت ٨ی بەیانی تا ٨ی شەو." },
-    { q: "چۆن پاسوۆردەکەم ریسێت دەکەم؟", a: "بڕۆ بۆ لاپەڕەی چوونەژوورەوە و کلیک لەسەر 'پاسوۆردم بیرم چووە' بکە." },
-    { q: "میزی یارمەتی IT کوێیە؟", a: "میزی یارمەتی IT لە بینای A، ژووری ١٠٥یە." },
-    { q: "چۆن کارتی ناسنامەی خوێندکاریم وەردەگرم؟", a: "سەردانی ئۆفیسی چارەنووسی خوێندکاران لە بینای B بکە و پشتڕاستکردنەوەی تۆمارکردن و وێنەیەکی پاسپۆرتی لەگەل خۆت بهێنە." }
-  ],
-  ar: [
-    { q: "ما هي ساعات العمل؟", a: "ساعات العمل من الأحد إلى الخميس، من الساعة 8 صباحاً حتى 4 مساءً." },
-    { q: "كيف أسجّل في المقررات الدراسية؟", a: "سجّل الدخول إلى بوابة الطالب، انتقل إلى 'تسجيل المقررات'، اختر المقررات المطلوبة وأكّد التسجيل قبل انتهاء الموعد النهائي." },
-    { q: "أين أجد الجدول الدراسي؟", a: "الجداول الدراسية متاحة في بوابة الطالب تحت 'الجدول الأكاديمي'." },
-    { q: "كيف أتقدم للحصول على منحة دراسية؟", a: "زر مكتب المساعدات المالية أو ادخل إلى البوابة وانتقل إلى 'المنح والمساعدات'." },
-    { q: "كيف أسحب مقرراً دراسياً؟", a: "لسحب مقرر، زر مكتب التسجيل أو استخدم بوابة الطالب خلال فترة الإضافة والحذف الرسمية." },
-    { q: "كيف أتواصل مع أستاذي؟", a: "بيانات التواصل مع الأساتذة مدرجة في خطة المقرر وفي دليل الجامعة." },
-    { q: "أين تقع المكتبة؟", a: "تقع المكتبة في المبنى C، الطابق الأرضي. تعمل من الأحد إلى الخميس من 8 صباحاً حتى 8 مساءً." },
-    { q: "كيف أعيد تعيين كلمة المرور؟", a: "انتقل إلى صفحة تسجيل الدخول وانقر على 'نسيت كلمة المرور' واتبع التعليمات." },
-    { q: "أين مكتب الدعم التقني؟", a: "مكتب الدعم التقني في المبنى A، غرفة 105." },
-    { q: "كيف أحصل على بطاقة هوية الطالب؟", a: "زر مكتب شؤون الطلاب في المبنى B مع تأكيد التسجيل وصورة بحجم جواز السفر." }
-  ]
-};
+  let officeList = [];
+  let faqCollection = { en: [], ku: [], ar: [] };
+  let currentLanguage = 'en';
 
-let currentLang = 'en';
+  let fullscreenTapCount = 0;
+  const jarvisTitleElement = document.getElementById('jarvisTitle');
 
-function setLang(lang) {
-  currentLang = lang;
-  const titles = { en: 'FAQ', ku: 'پرسیارە باوەکان', ar: 'الأسئلة الشائعة' };
-  document.getElementById('faq-list-title').textContent = titles[lang];
-  const dir = (lang === 'ar' || lang === 'ku') ? 'rtl' : 'ltr';
-  const container = document.getElementById('faq-questions-container');
-  container.innerHTML = '';
-  faqs[lang].forEach((item, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'faq-btn';
-    btn.setAttribute('dir', dir);
-    btn.textContent = item.q;
-    btn.onclick = () => {
-      const d = (currentLang === 'ar' || currentLang === 'ku') ? 'rtl' : 'ltr';
-      document.getElementById('faq-answer-box').setAttribute('dir', d);
-      document.getElementById('faq-answer-q').textContent = item.q;
-      document.getElementById('faq-answer-a').textContent = item.a;
-      go('page-faq-answer');
-    };
-    container.appendChild(btn);
-  });
-}
-
-const professors = [
-  { name: "Dr. Ahmed Hassan", room: "A-201" }, { name: "Dr. Sara Mohammed", room: "B-105" },
-  { name: "Prof. Karwan Jalal", room: "C-302" }, { name: "Dr. Layla Ibrahim", room: "A-114" },
-  { name: "Prof. Omar Aziz", room: "B-210" }, { name: "Dr. Nadia Saleh", room: "C-118" },
-  { name: "Prof. Hiwa Mustafa", room: "A-305" }, { name: "Dr. Rania Khalid", room: "B-202" },
-  { name: "Prof. Dara Rashid", room: "C-401" }, { name: "Dr. Zainab Ali", room: "A-109" },
-  { name: "Prof. Soran Tahir", room: "B-315" }, { name: "Dr. Maryam Farouk", room: "C-220" },
-  { name: "Prof. Rebaz Hama", room: "A-412" }, { name: "Dr. Yasmin Nouri", room: "B-108" },
-  { name: "Prof. Bahez Karim", room: "C-310" }
-];
-
-function renderProfs(list) {
-  const container = document.getElementById('prof-list');
-  container.innerHTML = '';
-  list.forEach(p => {
-    const row = document.createElement('div');
-    row.className = 'prof-row';
-    row.innerHTML = `<span class="prof-name">${p.name}</span><span class="prof-room">${p.room}</span>`;
-    container.appendChild(row);
-  });
-}
-
-function filterProfs() {
-  const q = document.getElementById('search-input').value.toLowerCase();
-  renderProfs(professors.filter(p => p.name.toLowerCase().includes(q)));
-}
-
-// ── KEYBOARD ──
-// FIX: track whether keyboard should stay open
-let keyboardLocked = false;
-
-const keyboardContainer = document.getElementById('keyboard-container');
-const searchInput = document.getElementById('search-input');
-const searchBtn = document.getElementById('search-btn');
-
-const backspaceIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>`;
-const searchIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
-
-const keyRows = [
-  ['Q','W','E','R','T','Y','U','I','O','P'],
-  ['A','S','D','F','G','H','J','K','L'],
-  ['Z','X','C','V','B','N','M'],
-  ['BACKSPACE','SPACE','SEARCH']
-];
-
-function buildKeyboard() {
-  let html = '';
-  keyRows.forEach(row => {
-    html += '<div class="kb-row">';
-    row.forEach(key => {
-      let cls = 'kb-key';
-      let content = key;
-      if (key === 'BACKSPACE') { cls += ' special'; content = backspaceIcon; }
-      else if (key === 'SEARCH') { cls += ' special'; content = searchIconSvg; }
-      else if (key === 'SPACE') { cls += ' space'; content = '␣'; }
-      html += `<div class="${cls}" data-key="${key}">${content}</div>`;
-    });
-    html += '</div>';
-  });
-  keyboardContainer.innerHTML = html;
-
-  document.querySelectorAll('.kb-key').forEach(kb => {
-    kb.addEventListener('mousedown', e => e.preventDefault()); // prevent input blur
-    kb.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const key = kb.dataset.key;
-      if (!key) return;
-
-      if (key === 'BACKSPACE') {
-        searchInput.value = searchInput.value.slice(0, -1);
-        filterProfs();
-      } else if (key === 'SPACE') {
-        searchInput.value += ' ';
-        filterProfs();
-      } else if (key === 'SEARCH') {
-        // FIX: hide keyboard and DON'T refocus input
-        filterProfs();
-        keyboardLocked = false;
-        hideKeyboard();
-      } else {
-        searchInput.value += key;
-        filterProfs();
-      }
-    });
-  });
-}
-
-function showKeyboard() {
-  keyboardLocked = true;
-  keyboardContainer.classList.add('show');
-}
-
-function hideKeyboard() {
-  keyboardLocked = false;
-  keyboardContainer.classList.remove('show');
-}
-
-// Show keyboard when search bar is tapped (but input is readonly so no system keyboard)
-searchInput.addEventListener('click', () => { showKeyboard(); });
-searchInput.addEventListener('touchstart', e => { e.preventDefault(); showKeyboard(); }, { passive: false });
-
-// Search button hides keyboard and filters
-searchBtn.addEventListener('mousedown', e => e.preventDefault());
-searchBtn.addEventListener('click', () => { filterProfs(); hideKeyboard(); });
-
-// Click outside hides keyboard
-document.addEventListener('click', (e) => {
-  if (!searchInput.contains(e.target) &&
-      !keyboardContainer.contains(e.target) &&
-      !searchBtn.contains(e.target)) {
-    hideKeyboard();
+  function goFullscreen() {
+    const docElement = document.documentElement;
+    if (docElement.requestFullscreen) {
+      docElement.requestFullscreen().catch(function(err) { console.warn("Fullscreen error:", err); });
+    }
   }
-});
 
-// ── JARVIS MIC ──
-let mediaRecorder, audioChunks = [], isRecording = false;
-const micBtn = document.getElementById('micBtn');
-const jarvisStatus = document.getElementById('jarvisStatus');
-const waveform = document.getElementById('waveform');
+  function exitFullscreen() {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(function(err) { console.warn("Exit error:", err); });
+    }
+  }
 
-function setJarvisStatus(text) { jarvisStatus.textContent = text; }
+  jarvisTitleElement.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isCurrentlyFullscreen = !!document.fullscreenElement;
+    if (!isCurrentlyFullscreen) {
+      goFullscreen();
+      fullscreenTapCount = 0;
+    } else {
+      fullscreenTapCount++;
+      jarvisTitleElement.style.transform = "scale(0.98)";
+      setTimeout(function() { jarvisTitleElement.style.transform = ""; }, 100);
+      if (fullscreenTapCount >= FULLSCREEN_EXIT_TAPS) {
+        exitFullscreen();
+        fullscreenTapCount = 0;
+        alert("Fullscreen unlocked (" + FULLSCREEN_EXIT_TAPS + " taps).");
+      }
+    }
+  });
 
-async function startRecording() {
-  if (isRecording) return;
-  isRecording = true;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    audioChunks = [];
-    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-    mediaRecorder.onstop = async () => {
-      setJarvisStatus('Processing...');
-      waveform.classList.remove('visible');
-      micBtn.classList.remove('recording');
-      const blob = new Blob(audioChunks);
-      const formData = new FormData();
-      formData.append('audio', blob);
-      try { await fetch('/audio', { method: 'POST', body: formData }); } catch(e) { setJarvisStatus('Error'); }
-      setJarvisStatus('Ready');
-      isRecording = false;
-      stream.getTracks().forEach(t => t.stop());
-    };
-    mediaRecorder.start();
-    micBtn.classList.add('recording');
-    waveform.classList.add('visible');
-    setJarvisStatus('Listening...');
-  } catch(e) { setJarvisStatus('Mic Denied'); isRecording = false; }
-}
+  function fetchOfficeData() {
+    const container = document.getElementById('officeListContainer');
+    container.innerHTML = '<div class="loader">Loading offices...</div>';
+    fetch(OFFICES_SHEET_URL)
+      .then(function(response) { return response.text(); })
+      .then(function(csvText) {
+        if (csvText.charCodeAt(0) === 0xFEFF) csvText = csvText.slice(1);
+        const lines = csvText.split(/\r?\n/).filter(function(line) { return line.trim().length > 0; });
+        if (lines.length < 2) throw new Error("No data rows");
+        const headers = lines[0].split(',').map(function(h) { return h.trim().replace(/^"|"$/g, '').toLowerCase(); });
+        const nameIndex = headers.indexOf('name');
+        const roomIndex = headers.indexOf('room');
+        if (nameIndex === -1 || roomIndex === -1) throw new Error("Missing 'name' or 'room' columns");
+        const newData = [];
+        for (var i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(function(c) { return c.trim().replace(/^"|"$/g, ''); });
+          if (cols.length <= nameIndex || cols.length <= roomIndex) continue;
+          let name = cols[nameIndex];
+          let room = cols[roomIndex];
+          if (name && room) newData.push({ name: name, room: room });
+        }
+        if (newData.length === 0) throw new Error("No valid entries");
+        officeList = newData;
+        showOfficesOnScreen(officeList);
+      })
+      .catch(function(err) {
+        console.error("Offices load error:", err);
+        container.innerHTML = '<div class="loader" style="color:red;">Failed to load offices. Check console.</div>';
+      });
+  }
 
-function stopRecording() { if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop(); }
+  function showOfficesOnScreen(list) {
+    const container = document.getElementById('officeListContainer');
+    container.innerHTML = '';
+    for (var i = 0; i < list.length; i++) {
+      const row = document.createElement('div');
+      row.className = 'prof-row';
+      row.innerHTML = '<span class="prof-name">' + cleanText(list[i].name) + '</span><span class="prof-room">' + cleanText(list[i].room) + '</span>';
+      container.appendChild(row);
+    }
+    if (list.length === 0) {
+      container.innerHTML = '<div class="loader">No matching offices found.</div>';
+    }
+  }
 
-micBtn.addEventListener('mousedown', startRecording);
-micBtn.addEventListener('mouseup', stopRecording);
-micBtn.addEventListener('mouseleave', stopRecording);
-micBtn.addEventListener('touchstart', e => { e.preventDefault(); startRecording(); }, { passive: false });
-micBtn.addEventListener('touchend', e => { e.preventDefault(); stopRecording(); }, { passive: false });
-micBtn.addEventListener('touchcancel', e => { e.preventDefault(); stopRecording(); }, { passive: false });
+  function filterOfficeList() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+    const filtered = officeList.filter(function(office) { return office.name.toLowerCase().includes(query); });
+    showOfficesOnScreen(filtered);
+  }
 
-setLang('en');
-renderProfs(professors);
-buildKeyboard();
-hideKeyboard();
+  function fetchFaqData() {
+    fetch(FAQ_SHEET_URL)
+      .then(function(response) { return response.text(); })
+      .then(function(csvText) {
+        if (csvText.charCodeAt(0) === 0xFEFF) csvText = csvText.slice(1);
+        const lines = csvText.split(/\r?\n/).filter(function(line) { return line.trim().length > 0; });
+        if (lines.length < 2) throw new Error("No data rows");
+        const headers = lines[0].split(',').map(function(h) { return h.trim().replace(/^"|"$/g, ''); });
+        const engQIdx = headers.findIndex(function(h) { return h.toLowerCase() === 'engquestion'; });
+        const engAIdx = headers.findIndex(function(h) { return h.toLowerCase() === 'enganswer'; });
+        const kuQIdx = headers.findIndex(function(h) { return h.toLowerCase() === 'kuquestion'; });
+        const kuAIdx = headers.findIndex(function(h) { return h.toLowerCase() === 'kuanswer'; });
+        const arQIdx = headers.findIndex(function(h) { return h.toLowerCase() === 'arquestion'; });
+        const arAIdx = headers.findIndex(function(h) { return h.toLowerCase() === 'aranswer'; });
+        if (engQIdx === -1 || engAIdx === -1 || kuQIdx === -1 || kuAIdx === -1 || arQIdx === -1 || arAIdx === -1) {
+          throw new Error("Missing required FAQ columns");
+        }
+        const newFaq = { en: [], ku: [], ar: [] };
+        for (var i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(function(c) { return c.trim().replace(/^"|"$/g, ''); });
+          if (cols.length <= Math.max(engQIdx, engAIdx, kuQIdx, kuAIdx, arQIdx, arAIdx)) continue;
+          const engQ = cols[engQIdx];
+          const engA = cols[engAIdx];
+          const kuQ = cols[kuQIdx];
+          const kuA = cols[kuAIdx];
+          const arQ = cols[arQIdx];
+          const arA = cols[arAIdx];
+          if (engQ && engA) newFaq.en.push({ q: engQ, a: engA });
+          if (kuQ && kuA) newFaq.ku.push({ q: kuQ, a: kuA });
+          if (arQ && arA) newFaq.ar.push({ q: arQ, a: arA });
+        }
+        if (newFaq.en.length === 0) throw new Error("No English FAQ entries");
+        faqCollection = newFaq;
+      })
+      .catch(function(err) {
+        console.error("FAQ load error:", err);
+        const container = document.getElementById('faqQuestionsContainer');
+        container.innerHTML = '<div class="loader" style="color:red;">Failed to load FAQs. Check console.</div>';
+      });
+  }
+
+  function setLanguage(lang) {
+    currentLanguage = lang;
+    const titles = { en: 'FAQ', ku: 'پرسیارە باوەکان', ar: 'الأسئلة الشائعة' };
+    document.getElementById('faqListTitle').textContent = titles[lang];
+    const dir = (lang === 'ar' || lang === 'ku') ? 'rtl' : 'ltr';
+    const container = document.getElementById('faqQuestionsContainer');
+    container.innerHTML = '';
+    const faqsForLang = faqCollection[lang];
+    if (!faqsForLang || faqsForLang.length === 0) {
+      container.innerHTML = '<div class="loader">No FAQs available in this language.</div>';
+      return;
+    }
+    for (var i = 0; i < faqsForLang.length; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'faq-btn';
+      btn.setAttribute('dir', dir);
+      btn.textContent = faqsForLang[i].q;
+      btn.onclick = (function(item) {
+        return function() {
+          const d = (currentLanguage === 'ar' || currentLanguage === 'ku') ? 'rtl' : 'ltr';
+          document.getElementById('faqAnswerBox').setAttribute('dir', d);
+          document.getElementById('faqAnswerQuestion').textContent = item.q;
+          document.getElementById('faqAnswerText').textContent = item.a;
+          goToPage('page-faq-answer');
+        };
+      })(faqsForLang[i]);
+      container.appendChild(btn);
+    }
+  }
+
+  function goToPage(pageId) {
+    const allPages = document.querySelectorAll('.page');
+    for (var i = 0; i < allPages.length; i++) {
+      allPages[i].classList.remove('active');
+    }
+    document.getElementById(pageId).classList.add('active');
+    if (pageId !== 'page-offices') hideCustomKeyboard();
+  }
+
+  let keyboardVisible = false;
+  const keyboardDiv = document.getElementById('keyboardContainer');
+  const officeSearchInput = document.getElementById('searchInput');
+  const officeSearchButton = document.getElementById('searchButton');
+
+  const backspaceIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>';
+  const searchIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+
+  const keyboardRows = [
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L'],
+    ['Z','X','C','V','B','N','M'],
+    ['BACKSPACE','SPACE','SEARCH']
+  ];
+
+  function buildCustomKeyboard() {
+    let html = '';
+    for (var r = 0; r < keyboardRows.length; r++) {
+      html += '<div class="kb-row">';
+      for (var k = 0; k < keyboardRows[r].length; k++) {
+        let key = keyboardRows[r][k];
+        let cls = 'kb-key';
+        let content = key;
+        if (key === 'BACKSPACE') { cls += ' special'; content = backspaceIcon; }
+        else if (key === 'SEARCH') { cls += ' special'; content = searchIconSvg; }
+        else if (key === 'SPACE') { cls += ' space'; content = '␣'; }
+        html += '<div class="' + cls + '" data-key="' + key + '">' + content + '</div>';
+      }
+      html += '</div>';
+    }
+    keyboardDiv.innerHTML = html;
+
+    const allKeys = document.querySelectorAll('.kb-key');
+    for (var i = 0; i < allKeys.length; i++) {
+      allKeys[i].addEventListener('mousedown', function(e) { e.preventDefault(); });
+      allKeys[i].addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = this.dataset.key;
+        if (!key) return;
+        if (key === 'BACKSPACE') {
+          officeSearchInput.value = officeSearchInput.value.slice(0, -1);
+          filterOfficeList();
+        } else if (key === 'SPACE') {
+          officeSearchInput.value += ' ';
+          filterOfficeList();
+        } else if (key === 'SEARCH') {
+          filterOfficeList();
+          keyboardVisible = false;
+          hideCustomKeyboard();
+        } else {
+          officeSearchInput.value += key;
+          filterOfficeList();
+        }
+      });
+    }
+  }
+
+  function showCustomKeyboard() {
+    keyboardVisible = true;
+    keyboardDiv.classList.add('show');
+  }
+
+  function hideCustomKeyboard() {
+    keyboardVisible = false;
+    keyboardDiv.classList.remove('show');
+  }
+
+  officeSearchInput.addEventListener('click', function() { showCustomKeyboard(); });
+  officeSearchInput.addEventListener('touchstart', function(e) { e.preventDefault(); showCustomKeyboard(); }, { passive: false });
+  officeSearchButton.addEventListener('mousedown', function(e) { e.preventDefault(); });
+  officeSearchButton.addEventListener('click', function() { filterOfficeList(); hideCustomKeyboard(); });
+  document.addEventListener('click', function(e) {
+    if (!officeSearchInput.contains(e.target) &&
+        !keyboardDiv.contains(e.target) &&
+        !officeSearchButton.contains(e.target)) {
+      hideCustomKeyboard();
+    }
+  });
+
+  let mediaRecorderObj = null;
+  let recordedAudioChunks = [];
+  let isRecordingActive = false;
+  const micButton = document.getElementById('micButton');
+  const jarvisStatusSpan = document.getElementById('jarvisStatusText');
+  const waveformDiv = document.getElementById('waveform');
+
+  function setJarvisMessage(text) { jarvisStatusSpan.textContent = text; }
+
+  function beginRecording() {
+    if (isRecordingActive) return;
+    isRecordingActive = true;
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        mediaRecorderObj = new MediaRecorder(stream);
+        recordedAudioChunks = [];
+        mediaRecorderObj.ondataavailable = function(e) { recordedAudioChunks.push(e.data); };
+        mediaRecorderObj.onstop = function() {
+          setJarvisMessage('Processing...');
+          waveformDiv.classList.remove('visible');
+          micButton.classList.remove('recording');
+          const audioBlob = new Blob(recordedAudioChunks);
+          const formData = new FormData();
+          formData.append('audio', audioBlob);
+          fetch('/audio', { method: 'POST', body: formData })
+            .catch(function() { setJarvisMessage('Error'); });
+          setJarvisMessage('Ready');
+          isRecordingActive = false;
+          stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        mediaRecorderObj.start();
+        micButton.classList.add('recording');
+        waveformDiv.classList.add('visible');
+        setJarvisMessage('Listening...');
+      })
+      .catch(function() { setJarvisMessage('Mic Denied'); isRecordingActive = false; });
+  }
+
+  function stopRecording() {
+    if (mediaRecorderObj && mediaRecorderObj.state === 'recording') {
+      mediaRecorderObj.stop();
+    }
+  }
+
+  micButton.addEventListener('mousedown', beginRecording);
+  micButton.addEventListener('mouseup', stopRecording);
+  micButton.addEventListener('mouseleave', stopRecording);
+  micButton.addEventListener('touchstart', function(e) { e.preventDefault(); beginRecording(); }, { passive: false });
+  micButton.addEventListener('touchend', function(e) { e.preventDefault(); stopRecording(); }, { passive: false });
+  micButton.addEventListener('touchcancel', function(e) { e.preventDefault(); stopRecording(); }, { passive: false });
+
+  function cleanText(str) {
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+
+  window.addEventListener('load', function() {
+    fetchOfficeData();
+    fetchFaqData();
+    setLanguage('en');
+    buildCustomKeyboard();
+    hideCustomKeyboard();
+  });
 </script>
 </body>
 </html>
