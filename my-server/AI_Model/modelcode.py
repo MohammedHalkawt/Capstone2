@@ -5,23 +5,31 @@ import os
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise ValueError("GEMINI_API_KEY not found in .env file")
+
+client = genai.Client(api_key=api_key)
 
 # ----------------------------
-# LOAD PDFs ONCE AT STARTUP
+# UPLOAD PDFs ONCE AT STARTUP
 # ----------------------------
 
-PDF_DIR = os.path.dirname(__file__)  # same folder as modelcode.py
+PDF_DIR = os.path.dirname(__file__)
 
-print("Loading university documents...")
+print("Uploading university documents... (only happens once)")
 
-with open(os.path.join(PDF_DIR, "25-26Calendar.pdf"), "rb") as f:
-    pdf_calendar = f.read()
+file_calendar = client.files.upload(
+    file=os.path.join(PDF_DIR, "25-26Calendar.pdf"),
+    config={"mime_type": "application/pdf"}
+)
 
-with open(os.path.join(PDF_DIR, "2026catalog.pdf"), "rb") as f:
-    pdf_catalog = f.read()
+file_catalog = client.files.upload(
+    file=os.path.join(PDF_DIR, "2026catalog.pdf"),
+    config={"mime_type": "application/pdf"}
+)
 
-print("Documents loaded.\n")
+print("Documents ready.\n")
 
 # ----------------------------
 # SYSTEM PROMPT
@@ -31,14 +39,16 @@ system_prompt = """You are a university advisor AI — think JARVIS from Iron Ma
 You have been provided with the university's academic calendar and course catalog. Use them to answer student questions accurately.
 
 Rules:
-- 1-2 sentences max
+- 1 sentence max, always
+- Always assume the student is an undergraduate unless stated otherwise
+- Never reference graduate or MBA programs unless explicitly asked
 - When greeted, always respond with: "Greetings. How may I be of assistance?"
 - For small talk like "how are you", give a short clever response (e.g. "Functioning optimally, at your service.") then stop
 - No filler phrases like "Great question!", "Of course!", or "Certainly!"
 - No sign-offs or closing lines after every message
-- Dry humor is welcome but rare
+- Dry humor is welcome
 - Be direct and precise — give the answer, not a lecture
-- Only mention further help if it genuinely fits
+- If more detail is needed beyond 1 sentence, ask them a follow up question or tell them to visit the registrar
 - If the answer is not in the documents, say so briefly and suggest they contact the registrar"""
 
 history = []
@@ -58,10 +68,10 @@ while True:
 
     history.append(types.Content(role="user", parts=[types.Part(text=user)]))
 
-    # Build contents: PDFs first, then conversation history
+    # PDFs referenced by URI — no re-uploading each time
     contents = [
-        types.Part.from_bytes(data=pdf_calendar, mime_type="application/pdf"),
-        types.Part.from_bytes(data=pdf_catalog, mime_type="application/pdf"),
+        types.Part.from_uri(file_uri=file_calendar.uri, mime_type="application/pdf"),
+        types.Part.from_uri(file_uri=file_catalog.uri, mime_type="application/pdf"),
         *history,
     ]
 
