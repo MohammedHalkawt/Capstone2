@@ -10,16 +10,18 @@ import os
 # ----------------------------
 
 SAMPLE_RATE = 16000
-DURATION = 5  # seconds to record, change as needed
+DURATION = 10  # seconds to record, change as needed
 
 # ----------------------------
 # LOAD MODEL
 # ----------------------------
 
 print("Loading Whisper model... (first time takes a minute)")
-model = whisper.load_model("medium")
-print("Model ready.\n")
+model = whisper.load_model("medium").to("cuda")
 
+print("Model ready.\n")
+print(f"Model running on: {next(model.parameters()).device}")
+# should print: cuda
 # ----------------------------
 # RECORD FROM MIC
 # ----------------------------
@@ -43,15 +45,22 @@ def record_audio(duration=DURATION, sample_rate=SAMPLE_RATE):
 def transcribe(audio, sample_rate=SAMPLE_RATE):
     # save to a temp wav file (whisper needs a file)
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    wav.write(tmp.name, sample_rate, audio)
+    tmp_path = tmp.name
+    tmp.close()  # ← close handle BEFORE writing, so Windows doesn't lock it
+
+    wav.write(tmp_path, sample_rate, audio)
 
     result = model.transcribe(
-        tmp.name,
+        tmp_path,
         language="en",
         initial_prompt="The speaker is a university student from Iraq. They may use numbers like 1, 2, 3, 4 and abbreviations like uni, CS, AI, GPA, prof."
     )
 
-    os.unlink(tmp.name)  # delete temp file
+    try:
+        os.unlink(tmp_path)  # delete temp file after whisper is done
+    except PermissionError:
+        pass  # if it still fails, not a big deal, OS will clean it up
+
     return result["text"].strip()
 
 # ----------------------------

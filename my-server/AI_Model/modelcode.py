@@ -1,7 +1,12 @@
 from google import genai
+from dotenv import load_dotenv
 from google.genai import types
+import os
 
-client = genai.Client(api_key="AIzaSyBEd334SJCUT5DJEEvjPO9LgdC5FdUktpI")
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 system_prompt =system_instruction="""You are a university advisor AI — think JARVIS from Iron Man. Calm, composed, subtly witty, never over-eager.
 
@@ -29,7 +34,7 @@ while True:
     history.append(types.Content(role="user", parts=[types.Part(text=user)]))
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.1-flash-lite-preview",
         contents=history,
         config=types.GenerateContentConfig(system_instruction=system_prompt)
     )
