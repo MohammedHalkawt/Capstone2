@@ -1,96 +1,67 @@
-import queue
+import whisper
 import sounddevice as sd
-import json
-import re
-from vosk import Model, KaldiRecognizer
+import numpy as np
+import scipy.io.wavfile as wav
+import tempfile
+import os
 
-MODEL_PATH = "SpeechToText/vosk-model-small-en-us-0.15"
+# ----------------------------
+# SETTINGS
+# ----------------------------
+
 SAMPLE_RATE = 16000
-
-print("Loading model...")
-model = Model(MODEL_PATH)
-recognizer = KaldiRecognizer(model, SAMPLE_RATE)
-
-recognizer.SetWords(True)
-recognizer.SetPartialWords(True)
-
-audio_queue = queue.Queue()
-last_partial = ""
+DURATION = 5  # seconds to record, change as needed
 
 # ----------------------------
-# TEXT NORMALIZATION
+# LOAD MODEL
 # ----------------------------
 
-number_map = {
-    "zero":"0","one":"1","two":"2","three":"3","four":"4","five":"5",
-    "six":"6","seven":"7","eight":"8","nine":"9","ten":"10",
-    "eleven":"11","twelve":"12","thirteen":"13","fourteen":"14",
-    "fifteen":"15","sixteen":"16","seventeen":"17","eighteen":"18",
-    "nineteen":"19","twenty":"20"
-}
-
-common_corrections = {
-    "to hours":"two hours",
-    "too hours":"two hours",
-    "for hours":"four hours",
-    "ate pm":"8 pm",
-    "won":"one"
-}
-
-def normalize_text(text):
-
-    text = text.lower()
-
-    # fix common homophones
-    for wrong, correct in common_corrections.items():
-        text = text.replace(wrong, correct)
-
-    # convert number words to digits
-    words = text.split()
-    words = [number_map.get(w, w) for w in words]
-    text = " ".join(words)
-
-    # remove duplicate spaces
-    text = re.sub(r'\s+', ' ', text).strip()
-
-    return text
+print("Loading Whisper model... (first time takes a minute)")
+model = whisper.load_model("medium")
+print("Model ready.\n")
 
 # ----------------------------
-# AUDIO CALLBACK
+# RECORD FROM MIC
 # ----------------------------
 
-def audio_callback(indata, frames, time, status):
-    audio_queue.put(bytes(indata))
+def record_audio(duration=DURATION, sample_rate=SAMPLE_RATE):
+    print(f"🎤 Recording for {duration} seconds... Speak now!")
+    audio = sd.rec(
+        int(duration * sample_rate),
+        samplerate=sample_rate,
+        channels=1,
+        dtype="int16"
+    )
+    sd.wait()  # wait until recording is done
+    print("Recording done.\n")
+    return audio
 
+# ----------------------------
+# TRANSCRIBE
+# ----------------------------
 
-print("🎤 Speak... (Ctrl+C to stop)\n")
+def transcribe(audio, sample_rate=SAMPLE_RATE):
+    # save to a temp wav file (whisper needs a file)
+    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    wav.write(tmp.name, sample_rate, audio)
 
-with sd.RawInputStream(
-    samplerate=SAMPLE_RATE,
-    blocksize=4000,
-    dtype="int16",
-    channels=1,
-    callback=audio_callback
-):
+    result = model.transcribe(
+        tmp.name,
+        language="en",
+        initial_prompt="The speaker is a university student from Iraq. They may use numbers like 1, 2, 3, 4 and abbreviations like uni, CS, AI, GPA, prof."
+    )
 
-    while True:
-        data = audio_queue.get()
+    os.unlink(tmp.name)  # delete temp file
+    return result["text"].strip()
 
-        if recognizer.AcceptWaveform(data):
+# ----------------------------
+# MAIN LOOP
+# ----------------------------
 
-            result = json.loads(recognizer.Result())
-            final_text = result.get("text", "").strip()
+print("Press Enter to start recording, Ctrl+C to quit.\n")
 
-            if final_text:
-                final_text = normalize_text(final_text)
-
-                print("\nFINAL:", final_text)
-                last_partial = ""
-
-        else:
-            partial = json.loads(recognizer.PartialResult())
-            partial_text = partial.get("partial", "").strip()
-
-            if partial_text and partial_text != last_partial:
-                print("\rLIVE:", partial_text, end="", flush=True)
-                last_partial = partial_text
+while True:
+    input("[ Press Enter to speak ]")
+    audio = record_audio()
+    text = transcribe(audio)
+    print(f"You said: {text}\n")
