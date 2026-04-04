@@ -89,7 +89,7 @@
   <div id="main-content">
 
     <div id="p-home" class="screen active">
-      <div class="title-txt" style="margin-top:40px;">JARVIS</div>
+      <div class="title-txt" id="title-lock" style="margin-top:40px;">JARVIS</div>
       <div class="sub-txt">Kiosk Interface</div>
       <div class="btn-wrap">
         <div class="btn-huge" onclick="navTo('p-lang')">FAQ</div>
@@ -371,6 +371,20 @@
     if(txtMic.innerText == "LISTENING...") {
       txtMic.innerText = "PROCESSING...";
       setTimeout(function() { txtMic.innerText = "READY"; }, 1500);
+    }
+  };
+
+  var tapCount = 0;
+  document.getElementById('title-lock').onclick = function() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      tapCount = 0;
+    } else {
+      tapCount++;
+      if (tapCount >= 20) {
+        document.exitFullscreen();
+        tapCount = 0;
+      }
     }
   };
 </script>
