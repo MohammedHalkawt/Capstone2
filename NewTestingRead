@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kiosk</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; font-family: 'Rajdhani', sans-serif; margin: 0; padding: 0; }
+    body { background: #ffffff; color: #000; overflow: hidden; user-select: none; }
+    
+    #topbar {
+      position: fixed; top: 0; left: 0; width: 100%; height: 90px;
+      display: flex; align-items: center; padding: 0 30px; z-index: 100;
+      background: #ffffff; border-bottom: 3px solid #000;
+    }
+    
+    .backbtn {
+      font-size: 32px; font-weight: 700; padding: 10px 40px;
+      background: #fff; border: 4px solid #000; border-radius: 12px;
+    }
+    .backbtn:active { background: #000; color: #fff; }
+
+    #main-content {
+      position: absolute; top: 90px; bottom: 0; left: 0; right: 0;
+      overflow-y: auto; padding: 40px 20px;
+    }
+    
+    .screen { display: none; width: 100%; flex-direction: column; align-items: center; }
+    .screen.active { display: flex; }
+    
+    .title-txt { font-size: 70px; font-weight: 700; margin-bottom: 20px; text-align: center; }
+    .sub-txt { font-size: 36px; color: #555; margin-bottom: 60px; text-align: center; text-transform: uppercase; }
+    
+    .btn-wrap { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 30px; }
+    .btn-huge {
+      font-size: 45px; font-weight: 700; padding: 40px 20px;
+      border: 4px solid #000; background: #fff; border-radius: 20px; text-align: center;
+    }
+    .btn-huge:active { background: #000; color: #fff; }
+    
+    .search-input {
+      width: 100%; max-width: 700px; font-size: 36px; font-weight: 700;
+      padding: 30px; border: 4px solid #000; border-radius: 15px; margin-bottom: 30px; outline: none;
+    }
+    
+    .list-area { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 20px; }
+    .row-item {
+      font-size: 32px; font-weight: 700; padding: 30px;
+      border: 4px solid #000; border-radius: 15px; background: #fff;
+    }
+    .row-item:active { background: #000; color: #fff; }
+    
+    .ans-box {
+      width: 100%; max-width: 700px; padding: 50px;
+      border: 4px solid #000; border-radius: 20px; background: #fff; margin-top: 20px;
+    }
+    .q-txt { font-size: 45px; font-weight: 700; border-bottom: 4px solid #000; padding-bottom: 30px; margin-bottom: 30px; }
+    .a-txt { font-size: 36px; font-weight: 600; color: #444; line-height: 1.4; }
+    
+    .kb-box {
+      width: 100%; max-width: 700px; background: #fff; border: 4px solid #000;
+      border-radius: 20px; padding: 20px; margin-bottom: 30px; display: none;
+    }
+    .kb-box.open { display: block; }
+    .kb-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+    .kb-key {
+      flex: 1; padding: 30px 0; font-size: 38px; font-weight: 700;
+      text-align: center; border: 3px solid #000; border-radius: 12px; background: #fff;
+    }
+    .kb-key:active { background: #000; color: #fff; }
+    .k-wide { flex: 2; font-size: 28px; background: #eee; }
+    .k-space { flex: 4; }
+
+    .mic-circle {
+      width: 300px; height: 300px; border-radius: 150px; border: 10px solid #000;
+      margin: 80px auto; display: flex; justify-content: center; align-items: center;
+      font-size: 60px; font-weight: 700; background: #fff;
+    }
+    .mic-circle.recording { background: #000; color: #fff; }
+  </style>
+</head>
+<body>
+
+  <div id="topbar">
+    <button class="backbtn" id="btnBack" onclick="goBack()">BACK</button>
+  </div>
+
+  <div id="main-content">
+
+    <div id="p-home" class="screen active">
+      <div class="title-txt" style="margin-top:40px;">JARVIS</div>
+      <div class="sub-txt">Kiosk Interface</div>
+      <div class="btn-wrap">
+        <div class="btn-huge" onclick="navTo('p-lang')">FAQ</div>
+        <div class="btn-huge" onclick="openDir()">OFFICES</div>
+        <div class="btn-huge" onclick="navTo('p-ai')">ASSISTANT</div>
+      </div>
+    </div>
+
+    <div id="p-lang" class="screen">
+      <div class="title-txt">LANGUAGE</div>
+      <div class="btn-wrap" style="margin-top:40px;">
+        <div class="btn-huge" onclick="openFaq('en')">ENGLISH</div>
+        <div class="btn-huge" onclick="openFaq('ku')">کوردی</div>
+        <div class="btn-huge" onclick="openFaq('ar')">العربية</div>
+      </div>
+    </div>
+
+    <div id="p-faq" class="screen">
+      <div class="title-txt" id="f-title">FAQ</div>
+      <input type="text" id="f-search" class="search-input" placeholder="SEARCH..." readonly>
+      <div id="f-kb" class="kb-box"></div>
+      <div id="f-list" class="list-area"></div>
+    </div>
+
+    <div id="p-ans" class="screen">
+      <div class="ans-box">
+        <div id="ans-q" class="q-txt"></div>
+        <div id="ans-a" class="a-txt"></div>
+      </div>
+    </div>
+
+    <div id="p-dir" class="screen">
+      <div class="title-txt">DIRECTORY</div>
+      <input type="text" id="d-search" class="search-input" placeholder="SEARCH..." readonly>
+      <div id="d-kb" class="kb-box"></div>
+      <div id="d-list" class="list-area"></div>
+    </div>
+
+    <div id="p-ai" class="screen">
+      <div class="title-txt">AI</div>
+      <div id="mic" class="mic-circle">MIC</div>
+      <div class="sub-txt" id="ai-txt">READY</div>
+    </div>
+
+  </div>
+
+<script>
+  var faqs = [];
+  var offices = [];
+  var lang = 'en';
+  var curInput = null;
+  var curKb = null;
+  var curPage = 'p-home';
+  var lastPage = 'p-home';
+
+  var fUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShnUz-r7psqJ1eTeBKjsT6uwD5pguKVH7QDx_blm0xQWBPwHCJX4zo8LB5LIOLNyPmLud4woHyUFZq/pub?output=csv";
+  var dUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTl2ae_I6i3rPM09ELaYVfsfZ6G54xvQmN3-xMrr-AvN2W18zuULSG217N4QjNX6uDlpJLGz6fHEJcj/pub?output=csv";
+
+  function parseCSV(str) {
+    var arr = [];
+    var quote = false;
+    var row = 0;
+    var col = 0;
+    for (var c = 0; c < str.length; c++) {
+      var cc = str[c], nc = str[c+1];
+      arr[row] = arr[row] || [];
+      arr[row][col] = arr[row][col] || '';
+      if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+      if (cc == '"') { quote = !quote; continue; }
+      if (cc == ',' && !quote) { ++col; continue; }
+      if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+      if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+      if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+      arr[row][col] += cc;
+    }
+    return arr;
+  }
+
+  window.onload = function() {
+    document.getElementById('topbar').style.display = 'none';
+    
+    fetch(fUrl).then(function(res) { return res.text(); }).then(function(txt) {
+      var lines = parseCSV(txt);
+      for(var i=1; i<lines.length; i++) {
+        if(lines[i].length >= 6) {
+          faqs.push({
+            en: {q: lines[i][0], a: lines[i][1]},
+            ku: {q: lines[i][2], a: lines[i][3]},
+            ar: {q: lines[i][4], a: lines[i][5]}
+          });
+        }
+      }
+    });
+
+    fetch(dUrl).then(function(res) { return res.text(); }).then(function(txt) {
+      var lines = parseCSV(txt);
+      for(var i=1; i<lines.length; i++) {
+        if(lines[i][0] && lines[i][1]) {
+          offices.push({ n: lines[i][0], r: lines[i][1] });
+        }
+      }
+    });
+  };
+
+  function navTo(id) {
+    lastPage = curPage;
+    curPage = id;
+    var pages = document.getElementsByClassName('screen');
+    for(var i=0; i<pages.length; i++) {
+      pages[i].classList.remove('active');
+    }
+    document.getElementById(id).classList.add('active');
+    
+    if(id == 'p-home') {
+      document.getElementById('topbar').style.display = 'none';
+      document.getElementById('main-content').style.top = '0px';
+    } else {
+      document.getElementById('topbar').style.display = 'flex';
+      document.getElementById('main-content').style.top = '90px';
+    }
+    closeKb();
+    document.getElementById('main-content').scrollTop = 0;
+  }
+
+  function goBack() {
+    if(curPage == 'p-ans') { navTo('p-faq'); }
+    else if(curPage == 'p-faq') { navTo('p-lang'); }
+    else { navTo('p-home'); }
+  }
+
+  function openFaq(selLang) {
+    lang = selLang;
+    document.getElementById('f-search').value = '';
+    
+    if(lang == 'en') { document.getElementById('f-title').innerText = "FAQ"; }
+    if(lang == 'ku') { document.getElementById('f-title').innerText = "پرسیارەکان"; }
+    if(lang == 'ar') { document.getElementById('f-title').innerText = "الأسئلة"; }
+
+    var d = (lang == 'ar' || lang == 'ku') ? 'rtl' : 'ltr';
+    document.getElementById('p-faq').setAttribute('dir', d);
+    document.getElementById('p-ans').setAttribute('dir', d);
+
+    setupKb(lang, 'f-kb', 'f-search');
+    showFaqs(faqs);
+    navTo('p-faq');
+  }
+
+  function openDir() {
+    document.getElementById('d-search').value = '';
+    setupKb('en', 'd-kb', 'd-search');
+    showOffices(offices);
+    navTo('p-dir');
+  }
+
+  function showFaqs(arr) {
+    var h = '';
+    for(var i=0; i<arr.length; i++) {
+      var t = arr[i][lang].q;
+      if(t) {
+        h += '<div class="row-item" onclick="viewAns('+i+')">' + t + '</div>';
+      }
+    }
+    document.getElementById('f-list').innerHTML = h;
+  }
+
+  function viewAns(idx) {
+    var item = faqs[idx][lang];
+    document.getElementById('ans-q').innerText = item.q;
+    document.getElementById('ans-a').innerText = item.a;
+    navTo('p-ans');
+  }
+
+  function showOffices(arr) {
+    var h = '';
+    for(var i=0; i<arr.length; i++) {
+      h += '<div class="row-item">' + arr[i].n + ' - ' + arr[i].r + '</div>';
+    }
+    document.getElementById('d-list').innerHTML = h;
+  }
+
+  var layouts = {
+    en: [
+      ['Q','W','E','R','T','Y','U','I','O','P'],
+      ['A','S','D','F','G','H','J','K','L'],
+      ['Z','X','C','V','B','N','M'],
+      ['DEL','SPACE','HIDE']
+    ],
+    ar: [
+      ['ض','ص','ث','ق','ف','غ','ع','ه','خ','ح','ج','د'],
+      ['ش','س','ي','ب','ل','ا','ت','ن','م','ك','ط'],
+      ['ئ','ء','ؤ','ر','لا','ى','ة','و','ز','ظ'],
+      ['DEL','SPACE','HIDE']
+    ],
+    ku: [
+      ['ق','و','ە','ر','ت','ی','ۆ','ئ','پ','ش'],
+      ['ا','س','د','ف','گ','ه','ج','ک','ل','چ'],
+      ['ز','خ','ح','ڤ','ب','ن','م','ڕ','ڵ','ژ'],
+      ['DEL','SPACE','HIDE']
+    ]
+  };
+
+  function setupKb(l, boxId, inputId) {
+    var keys = layouts[l];
+    var h = '';
+    for(var r=0; r<keys.length; r++) {
+      h += '<div class="kb-row">';
+      for(var k=0; k<keys[r].length; k++) {
+        var c = keys[r][k];
+        var cls = 'kb-key';
+        var txt = c;
+        if(c == 'DEL' || c == 'HIDE') { cls += ' k-wide'; }
+        if(c == 'SPACE') { cls += ' k-space'; txt = ' '; }
+        h += '<div class="'+cls+'" onclick="typeChar(\''+c+'\', \''+inputId+'\')">'+txt+'</div>';
+      }
+      h += '</div>';
+    }
+    document.getElementById(boxId).innerHTML = h;
+  }
+
+  function typeChar(c, inputId) {
+    var el = document.getElementById(inputId);
+    if(c == 'HIDE') { closeKb(); return; }
+    if(c == 'DEL') { el.value = el.value.slice(0, -1); }
+    else if(c == 'SPACE') { el.value += ' '; }
+    else { el.value += c; }
+
+    var word = el.value.toLowerCase();
+
+    if(inputId == 'f-search') {
+      var found = [];
+      for(var i=0; i<faqs.length; i++) {
+        var qq = faqs[i][lang].q.toLowerCase();
+        var aa = faqs[i][lang].a.toLowerCase();
+        if(qq.indexOf(word) > -1 || aa.indexOf(word) > -1) {
+          found.push(faqs[i]);
+        }
+      }
+      showFaqs(found);
+    } else {
+      var found = [];
+      for(var i=0; i<offices.length; i++) {
+        var nn = offices[i].n.toLowerCase();
+        var rr = offices[i].r.toLowerCase();
+        if(nn.indexOf(word) > -1 || rr.indexOf(word) > -1) {
+          found.push(offices[i]);
+        }
+      }
+      showOffices(found);
+    }
+  }
+
+  function openKb(inputId, boxId) {
+    closeKb();
+    curInput = document.getElementById(inputId);
+    curKb = document.getElementById(boxId);
+    curKb.classList.add('open');
+  }
+
+  function closeKb() {
+    if(curKb) { curKb.classList.remove('open'); }
+    curInput = null;
+  }
+
+  document.getElementById('f-search').onclick = function() { openKb('f-search', 'f-kb'); };
+  document.getElementById('d-search').onclick = function() { openKb('d-search', 'd-kb'); };
+
+  var btnMic = document.getElementById('mic');
+  var txtMic = document.getElementById('ai-txt');
+  
+  btnMic.onmousedown = btnMic.ontouchstart = function(e) {
+    e.preventDefault();
+    btnMic.classList.add('recording');
+    txtMic.innerText = "LISTENING...";
+  };
+  
+  btnMic.onmouseup = btnMic.ontouchend = btnMic.onmouseleave = function(e) {
+    e.preventDefault();
+    btnMic.classList.remove('recording');
+    if(txtMic.innerText == "LISTENING...") {
+      txtMic.innerText = "PROCESSING...";
+      setTimeout(function() { txtMic.innerText = "READY"; }, 1500);
+    }
+  };
+</script>
+</body>
+</html>
