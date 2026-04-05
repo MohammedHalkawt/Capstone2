@@ -17,9 +17,7 @@ print(f"Model ready in {time.time() - start:.1f}s\n")
 
 def synthesize(text: str):
     wav = model.generate(
-        text,
-        audio_prompt_path=REFERENCE_WAV,
-        cfg_weight=0.3
+        text
     )
     torchaudio.save(OUTPUT_FILE, wav, model.sr)
 
