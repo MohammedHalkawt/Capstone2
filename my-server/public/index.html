@@ -78,6 +78,13 @@
       font-size: 60px; font-weight: 700; background: #fff;
     }
     .mic-circle.recording { background: #000; color: #fff; }
+
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0.4); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 30px rgba(0,0,0,0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+    }
+    .mic-circle.speaking { animation: pulse 1s infinite; border-color: #000; }
   </style>
 </head>
 <body>
@@ -129,7 +136,7 @@
     </div>
 
     <div id="p-ai" class="screen">
-      <div class="title-txt">AI</div>
+      <div class="title-txt">ASSISTANT</div>
       <div id="mic" class="mic-circle">MIC</div>
       <div class="sub-txt" id="ai-txt">READY</div>
     </div>
@@ -382,6 +389,10 @@
   var currentAudio = null;
   var silenceTimer = null;
   var audioContext = null;
+  var SILENCE_THRESHOLD = 15;
+  var SILENCE_DELAY = 1800;
+  var MIN_RECORD_TIME = 2000;
+  var recordingStartTime = null;
 
   function stopCurrentAudio() {
     if (currentAudio) {
@@ -405,6 +416,7 @@
         mediaRecorderObj.ondataavailable = function(e) { recordedAudioChunks.push(e.data); };
         mediaRecorderObj.onstop = function() {
           clearTimeout(silenceTimer);
+          silenceTimer = null;
           if (audioContext) { audioContext.close(); audioContext = null; }
 
           txtMic.innerText = 'PROCESSING...';
@@ -439,23 +451,20 @@
           stream.getTracks().forEach(function(t) { t.stop(); });
         };
 
-        // silence detection
         audioContext = new AudioContext();
         var source = audioContext.createMediaStreamSource(stream);
         var analyser = audioContext.createAnalyser();
         analyser.fftSize = 512;
         source.connect(analyser);
-
         var dataArray = new Uint8Array(analyser.frequencyBinCount);
-        var SILENCE_THRESHOLD = 10;
-        var SILENCE_DELAY = 1800; // ms of silence before stopping
 
         function checkSilence() {
           if (!isRecordingActive) return;
           analyser.getByteFrequencyData(dataArray);
           var avg = dataArray.reduce(function(a, b) { return a + b; }, 0) / dataArray.length;
+          var elapsed = Date.now() - recordingStartTime;
 
-          if (avg < SILENCE_THRESHOLD) {
+          if (avg < SILENCE_THRESHOLD && elapsed > MIN_RECORD_TIME) {
             if (!silenceTimer) {
               silenceTimer = setTimeout(function() {
                 stopRecording();
@@ -469,6 +478,7 @@
         }
 
         mediaRecorderObj.start();
+        recordingStartTime = Date.now();
         btnMic.classList.add('recording');
         txtMic.innerText = 'LISTENING...';
         checkSilence();

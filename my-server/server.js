@@ -51,8 +51,7 @@ geminiPy.stdout.on("data", (data) => {
 });
 geminiPy.stderr.on("data", () => {});
 
-// --- Spawn Piper TTS ---
-const ttsPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\TTS\\tts_engine.py"]);
+const ttsPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\TTS\\textToSpeech.py"]);
 let pendingTTS = null;
 let ttsBuffer = "";
 
