@@ -31,7 +31,7 @@ whisperPy.stdout.on("data", (data) => {
 whisperPy.stderr.on("data", () => {});
 
 // --- Spawn Gemini ---
-const geminiPy = spawn("python", ["modelcode.py"]);
+const geminiPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\my-server\\AI_Model\\modelcode.py"]);
 let pendingGemini = null;
 let geminiBuffer = "";
 
@@ -52,7 +52,7 @@ geminiPy.stdout.on("data", (data) => {
 geminiPy.stderr.on("data", () => {});
 
 // --- Spawn Piper TTS ---
-const ttsPy = spawn("python", ["tts_engine.py"]);
+const ttsPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\TTS\\tts_engine.py"]);
 let pendingTTS = null;
 let ttsBuffer = "";
 

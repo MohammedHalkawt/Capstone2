@@ -379,9 +379,24 @@
   var mediaRecorderObj = null;
   var recordedAudioChunks = [];
   var isRecordingActive = false;
+  var currentAudio = null;
+  var silenceTimer = null;
+  var audioContext = null;
+
+  function stopCurrentAudio() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = '';
+      currentAudio = null;
+    }
+    btnMic.classList.remove('speaking');
+  }
 
   function beginRecording() {
     if (isRecordingActive) return;
+
+    stopCurrentAudio();
+
     isRecordingActive = true;
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(function(stream) {
@@ -389,6 +404,9 @@
         recordedAudioChunks = [];
         mediaRecorderObj.ondataavailable = function(e) { recordedAudioChunks.push(e.data); };
         mediaRecorderObj.onstop = function() {
+          clearTimeout(silenceTimer);
+          if (audioContext) { audioContext.close(); audioContext = null; }
+
           txtMic.innerText = 'PROCESSING...';
           btnMic.classList.remove('recording');
 
@@ -404,12 +422,15 @@
             .then(function(blob) {
               if (!blob) return;
               var url = URL.createObjectURL(blob);
-              var audio = new Audio(url);
+              currentAudio = new Audio(url);
+              btnMic.classList.add('speaking');
               txtMic.innerText = 'SPEAKING...';
-              audio.play();
-              audio.onended = function() {
+              currentAudio.play();
+              currentAudio.onended = function() {
+                btnMic.classList.remove('speaking');
                 txtMic.innerText = 'READY';
                 URL.revokeObjectURL(url);
+                currentAudio = null;
               };
             })
             .catch(function() { txtMic.innerText = 'ERROR'; });
@@ -417,9 +438,40 @@
           isRecordingActive = false;
           stream.getTracks().forEach(function(t) { t.stop(); });
         };
+
+        // silence detection
+        audioContext = new AudioContext();
+        var source = audioContext.createMediaStreamSource(stream);
+        var analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+
+        var dataArray = new Uint8Array(analyser.frequencyBinCount);
+        var SILENCE_THRESHOLD = 10;
+        var SILENCE_DELAY = 1800; // ms of silence before stopping
+
+        function checkSilence() {
+          if (!isRecordingActive) return;
+          analyser.getByteFrequencyData(dataArray);
+          var avg = dataArray.reduce(function(a, b) { return a + b; }, 0) / dataArray.length;
+
+          if (avg < SILENCE_THRESHOLD) {
+            if (!silenceTimer) {
+              silenceTimer = setTimeout(function() {
+                stopRecording();
+              }, SILENCE_DELAY);
+            }
+          } else {
+            clearTimeout(silenceTimer);
+            silenceTimer = null;
+          }
+          requestAnimationFrame(checkSilence);
+        }
+
         mediaRecorderObj.start();
         btnMic.classList.add('recording');
         txtMic.innerText = 'LISTENING...';
+        checkSilence();
       })
       .catch(function() {
         txtMic.innerText = 'MIC DENIED';
