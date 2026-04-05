@@ -391,12 +391,29 @@
         mediaRecorderObj.onstop = function() {
           txtMic.innerText = 'PROCESSING...';
           btnMic.classList.remove('recording');
+
           var audioBlob = new Blob(recordedAudioChunks);
           var formData = new FormData();
           formData.append('audio', audioBlob);
+
           fetch('/audio', { method: 'POST', body: formData })
+            .then(function(res) {
+              if (!res.ok) { txtMic.innerText = 'ERROR'; return; }
+              return res.blob();
+            })
+            .then(function(blob) {
+              if (!blob) return;
+              var url = URL.createObjectURL(blob);
+              var audio = new Audio(url);
+              txtMic.innerText = 'SPEAKING...';
+              audio.play();
+              audio.onended = function() {
+                txtMic.innerText = 'READY';
+                URL.revokeObjectURL(url);
+              };
+            })
             .catch(function() { txtMic.innerText = 'ERROR'; });
-          txtMic.innerText = 'READY';
+
           isRecordingActive = false;
           stream.getTracks().forEach(function(t) { t.stop(); });
         };

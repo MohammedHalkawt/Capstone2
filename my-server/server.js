@@ -2,108 +2,144 @@ const express = require("express");
 const multer = require("multer");
 const { spawn } = require("child_process");
 const fs = require("fs");
+const path = require("path");
 
 const app = express();
 const upload = multer();
 
 app.use(express.static("public"));
 
-// ----------------------------
-// Spawn Python ONCE at startup
-// ----------------------------
+// --- Spawn Whisper ---
+const whisperPy = spawn("python", ["speech-server.py"]);
+let pendingWhisper = null;
+let whisperBuffer = "";
 
-const py = spawn("python", ["speech-server.py"]);
-
-let pendingResolve = null;
-let outputBuffer = "";
-
-py.stdout.on("data", (data) => {
-  outputBuffer += data.toString();
-  const lines = outputBuffer.split("\n");
-  outputBuffer = lines.pop(); // keep incomplete line
-
+whisperPy.stdout.on("data", (data) => {
+  whisperBuffer += data.toString();
+  const lines = whisperBuffer.split("\n");
+  whisperBuffer = lines.pop();
   for (const line of lines) {
     if (line.startsWith("FINAL:")) {
       const text = line.replace("FINAL:", "").trim();
-      console.log("PYTHON:", text);
-      fs.writeFileSync(
-        "C:/Users/hama2/OneDrive/Documents/GitHub/Capstone2/TTS/input.txt",
-        text
-      );
-      if (pendingResolve) {
-        pendingResolve(text);
-        pendingResolve = null;
-      }
+      console.log("Transcribed:", text);
+      if (pendingWhisper) { pendingWhisper(text); pendingWhisper = null; }
     } else if (line.trim()) {
-      console.log("PYTHON:", line.trim()); // model ready, etc — only logged once
+      console.log("Whisper:", line.trim());
     }
   }
 });
+whisperPy.stderr.on("data", () => {});
 
-py.stderr.on("data", () => {}); // suppress whisper/cuda logs
+// --- Spawn Gemini ---
+const geminiPy = spawn("python", ["modelcode.py"]);
+let pendingGemini = null;
+let geminiBuffer = "";
 
-py.on("exit", (code) => {
-  console.error("Python process exited with code", code);
+geminiPy.stdout.on("data", (data) => {
+  geminiBuffer += data.toString();
+  const lines = geminiBuffer.split("\n");
+  geminiBuffer = lines.pop();
+  for (const line of lines) {
+    if (line.startsWith("REPLY:")) {
+      const text = line.replace("REPLY:", "").trim();
+      console.log("Gemini:", text);
+      if (pendingGemini) { pendingGemini(text); pendingGemini = null; }
+    } else if (line.trim()) {
+      console.log("Gemini:", line.trim());
+    }
+  }
 });
+geminiPy.stderr.on("data", () => {});
 
-// ----------------------------
-// Per-request: ffmpeg -> py stdin
-// ----------------------------
+// --- Spawn Piper TTS ---
+const ttsPy = spawn("python", ["tts_engine.py"]);
+let pendingTTS = null;
+let ttsBuffer = "";
 
-// We need a queue so concurrent requests don't overlap
+ttsPy.stdout.on("data", (data) => {
+  ttsBuffer += data.toString();
+  const lines = ttsBuffer.split("\n");
+  ttsBuffer = lines.pop();
+  for (const line of lines) {
+    if (line.trim() === "DONE") {
+      if (pendingTTS) { pendingTTS(); pendingTTS = null; }
+    } else if (line.trim()) {
+      console.log("TTS:", line.trim());
+    }
+  }
+});
+ttsPy.stderr.on("data", () => {});
+
+// --- Queue ---
 let busy = false;
 const queue = [];
 
 function processNext() {
   if (busy || queue.length === 0) return;
   busy = true;
-
   const { audioBuffer, res } = queue.shift();
 
+  // Step 1: ffmpeg
   const ffmpeg = spawn("C:\\ffmpeg\\bin\\ffmpeg.exe", [
-    "-i", "pipe:0",
-    "-ar", "16000",
-    "-ac", "1",
-    "-f", "s16le",
-    "pipe:1"
+    "-i", "pipe:0", "-ar", "16000", "-ac", "1", "-f", "s16le", "pipe:1"
   ]);
-
   let pcmChunks = [];
   ffmpeg.stdout.on("data", chunk => pcmChunks.push(chunk));
   ffmpeg.stderr.on("data", () => {});
 
   ffmpeg.stdout.on("end", () => {
     const pcm = Buffer.concat(pcmChunks);
-
-    // Write a 4-byte little-endian length header so Python knows when the chunk ends
     const lenBuf = Buffer.alloc(4);
     lenBuf.writeUInt32LE(pcm.length, 0);
 
-    pendingResolve = (text) => {
-      res.send(text || "No speech detected");
-      busy = false;
-      processNext();
-    };
-
-    // Timeout safety — if Python never replies
-    const timeout = setTimeout(() => {
-      if (pendingResolve) {
-        pendingResolve = null;
-        res.send("No speech detected");
-        busy = false;
-        processNext();
+    // Step 2: Whisper
+    pendingWhisper = (transcribed) => {
+      if (!transcribed) {
+        res.status(400).send("No speech detected");
+        busy = false; processNext(); return;
       }
-    }, 30000);
 
-    // Wrap the real resolve to also clear the timeout
-    const originalResolve = pendingResolve;
-    pendingResolve = (text) => {
-      clearTimeout(timeout);
-      originalResolve(text);
+      // Step 3: Gemini
+      geminiPy.stdin.write(transcribed + "\n");
+
+      const geminiTimeout = setTimeout(() => {
+        if (pendingGemini) {
+          pendingGemini = null;
+          res.status(500).send("Gemini timeout");
+          busy = false; processNext();
+        }
+      }, 15000);
+
+      pendingGemini = (reply) => {
+        clearTimeout(geminiTimeout);
+
+        // Step 4: TTS
+        ttsPy.stdin.write(reply + "\n");
+
+        const ttsTimeout = setTimeout(() => {
+          if (pendingTTS) {
+            pendingTTS = null;
+            res.status(500).send("TTS timeout");
+            busy = false; processNext();
+          }
+        }, 15000);
+
+        pendingTTS = () => {
+          clearTimeout(ttsTimeout);
+
+          // Step 5: Send wav to browser
+          const ttsOut = path.resolve("tts_out.wav");
+          res.setHeader("Content-Type", "audio/wav");
+          res.sendFile(ttsOut, (err) => {
+            if (err) console.error("Send error:", err);
+            busy = false; processNext();
+          });
+        };
+      };
     };
 
-    py.stdin.write(lenBuf);
-    py.stdin.write(pcm);
+    whisperPy.stdin.write(lenBuf);
+    whisperPy.stdin.write(pcm);
   });
 
   ffmpeg.stdin.write(audioBuffer);
