@@ -1,25 +1,23 @@
 import warnings
 warnings.filterwarnings("ignore")
 
-import torchaudio
-import time
+import wave
+import subprocess
 import os
-from chatterbox.tts_turbo import ChatterboxTurboTTS
+import time
+from piper import PiperVoice
 
 OUTPUT_FILE = "output.wav"
-REFERENCE_WAV = "jarvis-intro-1.wav"
 INPUT_FILE = "input.txt"
 
-print("Loading model... (this takes ~60 seconds, only happens once)")
+print("Loading Piper model...")
 start = time.time()
-model = ChatterboxTurboTTS.from_pretrained(device="cuda")
+voice = PiperVoice.load("en_GB-alan-medium.onnx")
 print(f"Model ready in {time.time() - start:.1f}s\n")
 
 def synthesize(text: str):
-    wav = model.generate(
-        text
-    )
-    torchaudio.save(OUTPUT_FILE, wav, model.sr)
+    with wave.open(OUTPUT_FILE, "wb") as wf:
+        voice.synthesize_wav(text, wf)
 
 print("TTS ready, watching for input...")
 last_text = ""
@@ -33,6 +31,6 @@ while True:
             last_text = text
             print(f"Speaking: {text}")
             synthesize(text)
-            os.system("start output.wav")
+            subprocess.Popen(["start", OUTPUT_FILE], shell=True)
 
     time.sleep(0.3)
