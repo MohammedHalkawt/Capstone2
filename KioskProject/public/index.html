@@ -270,11 +270,11 @@
 
   function showFaqs(arr) {
     var h = '';
-    for(var i=0; i<arr.length; i++) {
-      var t = arr[i][lang].q;
-      if(t) {
-        h += '<div class="row-item" onclick="viewAns('+i+')">' + t + '</div>';
-      }
+    for (var i = 0; i < arr.length; i++) {
+        var t = arr[i][lang].q;
+        if (t) {
+            h += '<div class="row-item" onclick="viewAns(' + arr[i]._idx + ')">' + t + '</div>';
+        }
     }
     document.getElementById('f-list').innerHTML = h;
   }
@@ -342,13 +342,15 @@
 
     var word = el.value.toLowerCase();
 
-    if(inputId == 'f-search') {
-      var found = [];
-      for(var i=0; i<faqs.length; i++) {
+    if (inputId == 'f-search') {
+    var found = [];
+    for (var i = 0; i < faqs.length; i++) {
         var qq = faqs[i][lang].q.toLowerCase();
         var aa = faqs[i][lang].a.toLowerCase();
-        if(qq.indexOf(word) > -1 || aa.indexOf(word) > -1) {
-          found.push(faqs[i]);
+        if (qq.indexOf(word) > -1 || aa.indexOf(word) > -1) {
+            var item = faqs[i];
+            item._idx = i;
+            found.push(item);
         }
       }
       showFaqs(found);
