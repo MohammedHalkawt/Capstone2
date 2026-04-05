@@ -1,10 +1,9 @@
-import os
 import re
 import sys
 import wave
 from piper import PiperVoice
 
-VOICE_PATH = os.path.join(os.path.dirname(__file__), "en_US-hfc_male-medium.onnx")
+VOICE_PATH = "C:/Users/hama2/OneDrive/Documents/GitHub/Capstone2/TextToSpeech/en_US-hfc_male-medium.onnx"
 
 ROMAN = {
     'viii': 'eight', 'vii': 'seven', 'vi': 'six',
@@ -27,8 +26,7 @@ def normalize(text):
 
     return text
 
-
-print("Loading Piper model...", flush=True)
+print("Loading TextToSpeech...", flush=True)
 voice = PiperVoice.load(VOICE_PATH)
 print("READY", flush=True)
 

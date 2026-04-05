@@ -1,7 +1,6 @@
 const express = require("express");
 const multer = require("multer");
 const { spawn } = require("child_process");
-const fs = require("fs");
 const path = require("path");
 
 const app = express();
@@ -9,8 +8,8 @@ const upload = multer();
 
 app.use(express.static("public"));
 
-// --- Spawn Whisper ---
-const whisperPy = spawn("python", ["speech-server.py"]);
+
+const whisperPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\SpeechToText\\speechToText.py"]);
 let pendingWhisper = null;
 let whisperBuffer = "";
 
@@ -24,14 +23,15 @@ whisperPy.stdout.on("data", (data) => {
       console.log("Transcribed:", text);
       if (pendingWhisper) { pendingWhisper(text); pendingWhisper = null; }
     } else if (line.trim()) {
-      console.log("Whisper:", line.trim());
+      console.log("SpeechToText:", line.trim());
     }
   }
 });
-whisperPy.stderr.on("data", () => {});
+whisperPy.stderr.on("data", (data) => {
+  console.error("SpeechToText ERROR:", data.toString());
+});
 
-// --- Spawn Gemini ---
-const geminiPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\my-server\\AI_Model\\modelcode.py"]);
+const geminiPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\KioskProject\\AI_Model\\assistant.py"]);
 let pendingGemini = null;
 let geminiBuffer = "";
 
@@ -42,16 +42,18 @@ geminiPy.stdout.on("data", (data) => {
   for (const line of lines) {
     if (line.startsWith("REPLY:")) {
       const text = line.replace("REPLY:", "").trim();
-      console.log("Gemini:", text);
+      console.log("Assistant:", text);
       if (pendingGemini) { pendingGemini(text); pendingGemini = null; }
     } else if (line.trim()) {
-      console.log("Gemini:", line.trim());
+      console.log("Assistant:", line.trim());
     }
   }
 });
-geminiPy.stderr.on("data", () => {});
+geminiPy.stderr.on("data", (data) => {
+  console.error("Assistant ERROR:", data.toString());
+});
 
-const ttsPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\TTS\\textToSpeech.py"]);
+const ttsPy = spawn("python", ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\TextToSpeech\\textToSpeech.py"]);
 let pendingTTS = null;
 let ttsBuffer = "";
 
@@ -63,13 +65,14 @@ ttsPy.stdout.on("data", (data) => {
     if (line.trim() === "DONE") {
       if (pendingTTS) { pendingTTS(); pendingTTS = null; }
     } else if (line.trim()) {
-      console.log("TTS:", line.trim());
+      console.log("TextToSpeech:", line.trim());
     }
   }
 });
-ttsPy.stderr.on("data", () => {});
+ttsPy.stderr.on("data", (data) => {
+  console.error("TextToSpeech ERROR:", data.toString());
+});
 
-// --- Queue ---
 let busy = false;
 const queue = [];
 
@@ -78,7 +81,6 @@ function processNext() {
   busy = true;
   const { audioBuffer, res } = queue.shift();
 
-  // Step 1: ffmpeg
   const ffmpeg = spawn("C:\\ffmpeg\\bin\\ffmpeg.exe", [
     "-i", "pipe:0", "-ar", "16000", "-ac", "1", "-f", "s16le", "pipe:1"
   ]);
@@ -91,20 +93,18 @@ function processNext() {
     const lenBuf = Buffer.alloc(4);
     lenBuf.writeUInt32LE(pcm.length, 0);
 
-    // Step 2: Whisper
     pendingWhisper = (transcribed) => {
       if (!transcribed) {
         res.status(400).send("No speech detected");
         busy = false; processNext(); return;
       }
 
-      // Step 3: Gemini
       geminiPy.stdin.write(transcribed + "\n");
 
       const geminiTimeout = setTimeout(() => {
         if (pendingGemini) {
           pendingGemini = null;
-          res.status(500).send("Gemini timeout");
+          res.status(500).send("Assistant timeout");
           busy = false; processNext();
         }
       }, 15000);
@@ -112,7 +112,6 @@ function processNext() {
       pendingGemini = (reply) => {
         clearTimeout(geminiTimeout);
 
-        // Step 4: TTS
         ttsPy.stdin.write(reply + "\n");
 
         const ttsTimeout = setTimeout(() => {
@@ -126,7 +125,6 @@ function processNext() {
         pendingTTS = () => {
           clearTimeout(ttsTimeout);
 
-          // Step 5: Send wav to browser
           const ttsOut = path.resolve("tts_out.wav");
           res.setHeader("Content-Type", "audio/wav");
           res.sendFile(ttsOut, (err) => {
