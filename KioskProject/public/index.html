@@ -79,12 +79,19 @@
     }
     .mic-circle.recording { background: #000; color: #fff; }
 
-    @keyframes pulse {
-      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0.4); }
-      70% { transform: scale(1.05); box-shadow: 0 0 0 30px rgba(0,0,0,0); }
-      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+    .mic-circle.processing {
+      animation: processingAnim 1.8s ease-in-out infinite;
+      border-color: #aaa;
+      color: #999;
     }
-    .mic-circle.speaking { animation: pulse 1s infinite; border-color: #000; }
+    @keyframes processingAnim {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0.1); border-color: #999; }
+      33% { transform: scale(1.03); box-shadow: 0 0 18px 6px rgba(0,0,0,0.07); border-color: #ccc; }
+      66% { transform: scale(1.05); box-shadow: 0 0 30px 12px rgba(0,0,0,0.04); border-color: #ddd; }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,0,0,0.1); border-color: #999; }
+    }
+
+    .mic-circle.speaking { background: #000; color: #fff; }
   </style>
 </head>
 <body>
@@ -398,6 +405,80 @@
   var MIN_RECORD_TIME = 2000;
   var recordingStartTime = null;
 
+  var speakAnalyser = null;
+  var speakAnimFrame = null;
+  var speakAudioCtx = null;
+
+  var waitToneCtx = null;
+  var waitToneInterval = null;
+
+  function startWaitTone() {
+    try {
+      waitToneCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var notes = [880, 1100];
+      var idx = 0;
+      function playNote() {
+        if (!waitToneCtx || waitToneCtx.state === 'closed') return;
+        var osc = waitToneCtx.createOscillator();
+        var gain = waitToneCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(notes[idx], waitToneCtx.currentTime);
+        gain.gain.setValueAtTime(0.025, waitToneCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, waitToneCtx.currentTime + 0.18);
+        osc.connect(gain);
+        gain.connect(waitToneCtx.destination);
+        osc.start(waitToneCtx.currentTime);
+        osc.stop(waitToneCtx.currentTime + 0.18);
+        idx = (idx + 1) % notes.length;
+      }
+      playNote();
+      waitToneInterval = setInterval(playNote, 600);
+    } catch(e) {}
+  }
+
+  function stopWaitTone() {
+    if (waitToneInterval) { clearInterval(waitToneInterval); waitToneInterval = null; }
+    if (waitToneCtx) { waitToneCtx.close().catch(function(){}); waitToneCtx = null; }
+  }
+
+  function startSpeakAnimation(audioEl) {
+    try {
+      speakAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var source = speakAudioCtx.createMediaElementSource(audioEl);
+      speakAnalyser = speakAudioCtx.createAnalyser();
+      speakAnalyser.fftSize = 256;
+      speakAnalyser.smoothingTimeConstant = 0.85;
+      source.connect(speakAnalyser);
+      speakAnalyser.connect(speakAudioCtx.destination);
+
+      var data = new Uint8Array(speakAnalyser.frequencyBinCount);
+
+      function animate() {
+        if (!speakAnalyser) return;
+        speakAnalyser.getByteFrequencyData(data);
+        var sum = 0;
+        for (var i = 0; i < data.length; i++) sum += data[i];
+        var avg = sum / data.length;
+        var norm = avg / 128;
+        var scale = 1 + norm * 0.12;
+        var glow = norm * 25;
+        btnMic.style.transform = 'scale(' + scale + ')';
+        btnMic.style.boxShadow = '0 0 ' + glow + 'px rgba(0,0,0,0.15)';
+        speakAnimFrame = requestAnimationFrame(animate);
+      }
+      animate();
+    } catch(e) {}
+  }
+
+  function stopSpeakAnimation() {
+    if (speakAnimFrame) cancelAnimationFrame(speakAnimFrame);
+    speakAnimFrame = null;
+    btnMic.style.transform = '';
+    btnMic.style.boxShadow = '';
+    if (speakAudioCtx) { speakAudioCtx.close().catch(function(){}); speakAudioCtx = null; }
+    speakAnalyser = null;
+  }
+
   function stopCurrentAudio() {
     if (currentAudio) {
       currentAudio.pause();
@@ -405,6 +486,9 @@
       currentAudio = null;
     }
     btnMic.classList.remove('speaking');
+    btnMic.classList.remove('processing');
+    stopSpeakAnimation();
+    stopWaitTone();
   }
 
   function beginRecording() {
@@ -421,10 +505,14 @@
         mediaRecorderObj.onstop = function() {
           clearTimeout(silenceTimer);
           silenceTimer = null;
+          btnMic.style.transform = '';
+          btnMic.style.boxShadow = '';
           if (audioContext) { audioContext.close(); audioContext = null; }
 
           txtMic.innerText = 'PROCESSING...';
           btnMic.classList.remove('recording');
+          btnMic.classList.add('processing');
+          startWaitTone();
 
           var audioBlob = new Blob(recordedAudioChunks);
           var formData = new FormData();
@@ -432,24 +520,28 @@
 
           fetch('/audio', { method: 'POST', body: formData })
             .then(function(res) {
-              if (!res.ok) { txtMic.innerText = 'ERROR'; return; }
+              if (!res.ok) { btnMic.classList.remove('processing'); stopWaitTone(); txtMic.innerText = 'ERROR'; return; }
               return res.blob();
             })
             .then(function(blob) {
-              if (!blob) return;
+              if (!blob) { btnMic.classList.remove('processing'); stopWaitTone(); return; }
               var url = URL.createObjectURL(blob);
               currentAudio = new Audio(url);
+              stopWaitTone();
+              btnMic.classList.remove('processing');
               btnMic.classList.add('speaking');
               txtMic.innerText = 'SPEAKING...';
+              startSpeakAnimation(currentAudio);
               currentAudio.play();
               currentAudio.onended = function() {
                 btnMic.classList.remove('speaking');
+                stopSpeakAnimation();
                 txtMic.innerText = 'READY';
                 URL.revokeObjectURL(url);
                 currentAudio = null;
               };
             })
-            .catch(function() { txtMic.innerText = 'ERROR'; });
+            .catch(function() { btnMic.classList.remove('processing'); stopWaitTone(); txtMic.innerText = 'ERROR'; });
 
           isRecordingActive = false;
           stream.getTracks().forEach(function(t) { t.stop(); });
@@ -467,6 +559,12 @@
           analyser.getByteFrequencyData(dataArray);
           var avg = dataArray.reduce(function(a, b) { return a + b; }, 0) / dataArray.length;
           var elapsed = Date.now() - recordingStartTime;
+
+          var norm = avg / 128;
+          var scale = 1 + norm * 0.12;
+          var glow = norm * 25;
+          btnMic.style.transform = 'scale(' + scale + ')';
+          btnMic.style.boxShadow = '0 0 ' + glow + 'px rgba(255,255,255,0.2)';
 
           if (avg < SILENCE_THRESHOLD && elapsed > MIN_RECORD_TIME) {
             if (!silenceTimer) {
