@@ -3,6 +3,7 @@ import os
 from google import genai
 from dotenv import load_dotenv
 from google.genai import types
+import time
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -38,7 +39,6 @@ UNI_KEYWORDS = [
     "internship", "capstone", "thesis", "elective", "required"
 ]
 
-
 print("Uploading university documents...", flush=True)
 
 file_calendar = client.files.upload(
@@ -54,18 +54,41 @@ file_catalog = client.files.upload(
 print("Documents uploaded.", flush=True)
 print("READY", flush=True)
 
+last_text = ""
+last_time = 0
+DEDUP_WINDOW = 8
+
 def needs_pdf(text):
     text_lower = text.lower()
     if any(kw in text_lower for kw in UNI_KEYWORDS):
         return True
-    check = client.models.generate_content(
-        model="models/gemini-3.1-flash-lite-preview",
-        contents=[{
-            "role": "user",
-            "parts": [{"text": f"Is this question about university, academics, courses, or student life? Answer only yes or no:\n{text}"}]
-        }]
-    )
-    return check.text.strip().lower().startswith("yes")
+    try:
+        check = client.models.generate_content(
+            model="models/gemini-3.1-flash-lite-preview",
+            contents=[{
+                "role": "user",
+                "parts": [{"text": f"Is this question about university, academics, courses, or student life? Answer only yes or no:\n{text}"}]
+            }]
+        )
+        return check.text.strip().lower().startswith("yes")
+    except Exception:
+        return False
+
+def generate_with_retry(contents, config, retries=3, delay=5):
+    for attempt in range(retries):
+        try:
+            return client.models.generate_content(
+                model="models/gemini-3.1-flash-lite-preview",
+                contents=contents,
+                config=config
+            )
+        except Exception as e:
+            if "429" in str(e) and attempt < retries - 1:
+                print(f"Rate limited, waiting {delay}s...", flush=True)
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
 
 history = []
 
@@ -73,6 +96,14 @@ for line in sys.stdin:
     text = line.strip()
     if not text:
         continue
+
+    now = time.time()
+
+    if text == last_text and (now - last_time) < DEDUP_WINDOW:
+        continue
+
+    last_text = text
+    last_time = now
 
     history.append(types.Content(role="user", parts=[types.Part(text=text)]))
 
@@ -87,12 +118,15 @@ for line in sys.stdin:
     else:
         contents = [*history]
 
-    response = client.models.generate_content(
-        model="models/gemini-3.1-flash-lite-preview",
-        contents=contents,
-        config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT)
-    )
+    try:
+        response = generate_with_retry(
+            contents=contents,
+            config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT)
+        )
+        reply = response.text.strip()
+    except Exception as e:
+        reply = "I encountered an error; please try again in a moment."
+        print(f"ERROR: {e}", flush=True)
 
-    reply = response.text.strip()
     history.append(types.Content(role="model", parts=[types.Part(text=reply)]))
     print(f"REPLY:{reply}", flush=True)

@@ -177,16 +177,17 @@
 
   window.onload = function() {
     document.getElementById('topbar').style.display = 'none';
-    
     fetch(fUrl).then(function(res) { return res.text(); }).then(function(txt) {
       var lines = parseCSV(txt);
       for(var i=1; i<lines.length; i++) {
         if(lines[i].length >= 6) {
-          faqs.push({
-            en: {q: lines[i][0], a: lines[i][1]},
-            ku: {q: lines[i][2], a: lines[i][3]},
-            ar: {q: lines[i][4], a: lines[i][5]}
-          });
+          var entry = {
+              en: {q: lines[i][0], a: lines[i][1]},
+              ku: {q: lines[i][2], a: lines[i][3]},
+              ar: {q: lines[i][4], a: lines[i][5]},
+              _idx: faqs.length
+          };
+          faqs.push(entry);
         }
       }
     });
@@ -273,7 +274,8 @@
     for (var i = 0; i < arr.length; i++) {
         var t = arr[i][lang].q;
         if (t) {
-            h += '<div class="row-item" onclick="viewAns(' + arr[i]._idx + ')">' + t + '</div>';
+            var idx = arr[i]._idx !== undefined ? arr[i]._idx : faqs.indexOf(arr[i]);
+            h += '<div class="row-item" onclick="viewAns(' + idx + ')">' + t + '</div>';
         }
     }
     document.getElementById('f-list').innerHTML = h;
@@ -391,8 +393,8 @@
   var currentAudio = null;
   var silenceTimer = null;
   var audioContext = null;
-  var SILENCE_THRESHOLD = 15;
-  var SILENCE_DELAY = 1800;
+  var SILENCE_THRESHOLD = 10;
+  var SILENCE_DELAY = 2500;
   var MIN_RECORD_TIME = 2000;
   var recordingStartTime = null;
 
