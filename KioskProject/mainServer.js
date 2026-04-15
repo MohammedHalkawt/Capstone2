@@ -101,28 +101,41 @@ function processNext() {
 
       geminiPy.stdin.write(transcribed + "\n");
 
+      let geminiDone = false;
       const geminiTimeout = setTimeout(() => {
-        if (pendingGemini) {
+        if (!geminiDone) {
+          geminiDone = true;
           pendingGemini = null;
           res.status(500).send("Assistant timeout");
           busy = false; processNext();
         }
-      }, 15000);
+      }, 30000);
 
       pendingGemini = (reply) => {
+        if (geminiDone) return;
+        geminiDone = true;
         clearTimeout(geminiTimeout);
+
+        if (!reply) {
+          res.status(500).send("Empty assistant reply");
+          busy = false; processNext(); return;
+        }
 
         ttsPy.stdin.write(reply + "\n");
 
+        let ttsDone = false;
         const ttsTimeout = setTimeout(() => {
-          if (pendingTTS) {
+          if (!ttsDone) {
+            ttsDone = true;
             pendingTTS = null;
             res.status(500).send("TTS timeout");
             busy = false; processNext();
           }
-        }, 15000);
+        }, 30000);
 
         pendingTTS = () => {
+          if (ttsDone) return;
+          ttsDone = true;
           clearTimeout(ttsTimeout);
 
           const ttsOut = path.resolve("tts_out.wav");

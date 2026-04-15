@@ -64,7 +64,7 @@ def needs_pdf(text):
         return True
     try:
         check = client.models.generate_content(
-            model="models/gemini-3.1-flash-lite-preview",
+            model="models/gemini-2.5-flash-lite",
             contents=[{
                 "role": "user",
                 "parts": [{"text": f"Is this question about university, academics, courses, or student life? Answer only yes or no:\n{text}"}]
@@ -78,7 +78,7 @@ def generate_with_retry(contents, config, retries=3, delay=5):
     for attempt in range(retries):
         try:
             return client.models.generate_content(
-                model="models/gemini-3.1-flash-lite-preview",
+                model="models/gemini-2.5-flash-lite",
                 contents=contents,
                 config=config
             )
