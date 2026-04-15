@@ -107,7 +107,7 @@ function processNext() {
           res.status(500).send("Assistant timeout");
           busy = false; processNext();
         }
-      }, 15000);
+      }, 150000);
 
       pendingGemini = (reply) => {
         clearTimeout(geminiTimeout);

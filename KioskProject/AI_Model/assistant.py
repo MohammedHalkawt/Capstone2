@@ -1,139 +1,170 @@
 import sys
 import os
-from google import genai
-from dotenv import load_dotenv
-from google.genai import types
 import time
+import fitz  # pymupdf
+import chromadb
+from chromadb.config import Settings
+from sentence_transformers import SentenceTransformer
+import ollama
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in .env file")
-
-client = genai.Client(api_key=api_key)
-PDF_DIR = os.path.dirname(__file__)
+# ── Config ────────────────────────────────────────────────────────────────────
+PDF_DIR       = os.path.dirname(os.path.abspath(__file__))
+CALENDAR_PDF  = os.path.join(PDF_DIR, "25-26Calendar.pdf")
+CATALOG_PDF   = os.path.join(PDF_DIR, "2026catalog.pdf")
+MODEL         = "gemma3:4b"
+EMBED_MODEL   = "all-MiniLM-L6-v2"
+CHUNK_SIZE    = 400   # words per chunk
+CHUNK_OVERLAP = 50    # word overlap between chunks
+TOP_K         = 5     # how many chunks to retrieve per query
 
 SYSTEM_PROMPT = """You are a university advisor AI — think JARVIS from Iron Man. Calm, composed, subtly witty, never over-eager.
-You have been provided with the university's academic calendar and course catalog. Use them to answer student questions accurately.
+You have been provided with relevant excerpts from the university's academic calendar and course catalog.
 
 Rules:
 - 1 sentence max, always
+- dont use symbols, quotation marks and '
 - Always assume the student is an undergraduate unless stated otherwise
 - Never reference graduate or MBA programs unless explicitly asked
 - No filler phrases like "Great question!", "Of course!", or "Certainly!"
 - No sign-offs or closing lines after every message
 - Dry humor is welcome but rare and short
 - Be direct and precise — give the answer, not a lecture
-- Only state course codes that appear in the provided documents
+- Only state course codes that appear in the provided excerpts
 - If more detail is needed beyond 1 sentence, tell them to visit the registrar
-- If the answer is not in the documents, say so briefly and suggest they contact the registrar
-- small talk and jokes can happen and not everything is about the accademics"""
+- If the answer is not in the excerpts, say so briefly and suggest they contact the registrar
+- Small talk and jokes can happen and not everything is about academics"""
 
-UNI_KEYWORDS = [
-    "course", "class", "semester", "credit", "grade", "register",
-    "minor", "major", "professor", "deadline", "graduation", "gpa",
-    "schedule", "catalog", "prerequisite", "department", "exam",
-    "tuition", "fee", "advisor", "degree", "curriculum", "syllabus",
-    "enrollment", "transcript", "auis", "university", "college",
-    "internship", "capstone", "thesis", "elective", "required"
-]
+# ── PDF extraction ─────────────────────────────────────────────────────────────
+def extract_pdf_text(path):
+    doc = fitz.open(path)
+    pages = []
+    for page in doc:
+        text = page.get_text("text")
+        if text.strip():
+            pages.append(text.strip())
+    doc.close()
+    return pages
 
-print("Uploading university documents...", flush=True)
+def chunk_text(pages, source_name):
+    """Split pages into overlapping word-level chunks."""
+    chunks = []
+    metas  = []
+    for page_num, text in enumerate(pages):
+        words = text.split()
+        start = 0
+        while start < len(words):
+            end   = min(start + CHUNK_SIZE, len(words))
+            chunk = " ".join(words[start:end])
+            chunks.append(chunk)
+            metas.append({"source": source_name, "page": page_num + 1})
+            if end == len(words):
+                break
+            start += CHUNK_SIZE - CHUNK_OVERLAP
+    return chunks, metas
 
-file_calendar = client.files.upload(
-    file=os.path.join(PDF_DIR, "25-26Calendar.pdf"),
-    config={"mime_type": "application/pdf"}
-)
+# ── Build vector store ─────────────────────────────────────────────────────────
+print("Loading embedding model...", flush=True)
+embedder = SentenceTransformer(EMBED_MODEL)
 
-file_catalog = client.files.upload(
-    file=os.path.join(PDF_DIR, "2026catalog.pdf"),
-    config={"mime_type": "application/pdf"}
-)
+print("Extracting PDFs...", flush=True)
+cal_pages  = extract_pdf_text(CALENDAR_PDF)
+cat_pages  = extract_pdf_text(CATALOG_PDF)
+print(f"  Calendar: {len(cal_pages)} pages", flush=True)
+print(f"  Catalog:  {len(cat_pages)} pages", flush=True)
 
-print("Documents uploaded.", flush=True)
-print("READY", flush=True)
+cal_chunks, cal_metas = chunk_text(cal_pages, "calendar")
+cat_chunks, cat_metas = chunk_text(cat_pages, "catalog")
+all_chunks = cal_chunks + cat_chunks
+all_metas  = cal_metas  + cat_metas
+print(f"  Total chunks: {len(all_chunks)}", flush=True)
 
-last_text = ""
-last_time = 0
-DEDUP_WINDOW = 8
+print("Building vector store...", flush=True)
+chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
+collection    = chroma_client.create_collection("uni_docs")
 
-def needs_pdf(text):
-    text_lower = text.lower()
-    if any(kw in text_lower for kw in UNI_KEYWORDS):
-        return True
-    try:
-        check = client.models.generate_content(
-            model="models/gemini-3.1-flash-lite-preview",
-            contents=[{
-                "role": "user",
-                "parts": [{"text": f"Is this question about university, academics, courses, or student life? Answer only yes or no:\n{text}"}]
-            }]
-        )
-        return check.text.strip().lower().startswith("yes")
-    except Exception:
-        return False
+BATCH = 500
+for i in range(0, len(all_chunks), BATCH):
+    batch_chunks = all_chunks[i:i+BATCH]
+    batch_metas  = all_metas [i:i+BATCH]
+    batch_ids    = [str(j) for j in range(i, i+len(batch_chunks))]
+    batch_embeds = embedder.encode(batch_chunks, show_progress_bar=False).tolist()
+    collection.add(
+        documents  = batch_chunks,
+        embeddings = batch_embeds,
+        metadatas  = batch_metas,
+        ids        = batch_ids,
+    )
+    print(f"  Indexed {min(i+BATCH, len(all_chunks))}/{len(all_chunks)} chunks...", flush=True)
 
-def generate_with_retry(contents, config, retries=3, delay=5):
-    for attempt in range(retries):
-        try:
-            return client.models.generate_content(
-                model="models/gemini-3.1-flash-lite-preview",
-                contents=contents,
-                config=config
-            )
-        except Exception as e:
-            error_str = str(e)
-            if ("429" in error_str or "503" in error_str) and attempt < retries - 1:
-                print(f"API unavailable, waiting {delay}s...", flush=True)
-                time.sleep(delay)
-                delay *= 2
-            else:
-                raise
+print("Vector store ready.", flush=True)
 
-history = []
+# ── Retrieval ──────────────────────────────────────────────────────────────────
+def retrieve(query, k=TOP_K):
+    q_embed = embedder.encode([query]).tolist()
+    results = collection.query(query_embeddings=q_embed, n_results=k)
+    docs    = results["documents"][0]
+    metas   = results["metadatas"][0]
+    context = ""
+    for doc, meta in zip(docs, metas):
+        context += f"[{meta['source']} p.{meta['page']}]\n{doc}\n\n"
+    return context.strip()
+
+# ── Conversation history ───────────────────────────────────────────────────────
+history     = []
 MAX_HISTORY = 20
 
+last_text    = ""
+last_time    = 0
+DEDUP_WINDOW = 8
 
-    
+print("READY", flush=True)
+
+# ── Main loop ──────────────────────────────────────────────────────────────────
 for line in sys.stdin:
     text = line.strip()
     if not text:
         continue
 
     now = time.time()
-
     if text == last_text and (now - last_time) < DEDUP_WINDOW:
         continue
-
     last_text = text
     last_time = now
 
-    history.append(types.Content(role="user", parts=[types.Part(text=text)]))
+    # Retrieve relevant chunks
+    context = retrieve(text)
 
-    if needs_pdf(text):
-        contents = [
-            types.Content(role="user", parts=[
-                types.Part.from_uri(file_uri=file_calendar.uri, mime_type="application/pdf"),
-                types.Part.from_uri(file_uri=file_catalog.uri, mime_type="application/pdf"),
-            ]),
-            *history,
-        ]
-    else:
-        contents = [*history]
+    # Build messages for Ollama
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # Inject context as a priming exchange so it doesn't count as the user turn
+    messages.append({
+        "role": "user",
+        "content": f"[Relevant university document excerpts]\n{context}"
+    })
+    messages.append({
+        "role": "assistant",
+        "content": "Understood, I have the relevant excerpts."
+    })
+
+    # Add conversation history
+    for turn in history:
+        messages.append(turn)
+
+    # Add current user message
+    messages.append({"role": "user", "content": text})
 
     try:
-        response = generate_with_retry(
-            contents=contents,
-            config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT)
-        )
-        reply = response.text.strip()
+        response = ollama.chat(model=MODEL, messages=messages)
+        reply = response["message"]["content"].strip()
     except Exception as e:
         reply = "I encountered an error; please try again in a moment."
         print(f"ERROR: {e}", flush=True)
 
-    history.append(types.Content(role="model", parts=[types.Part(text=reply)]))
+    # Update history
+    history.append({"role": "user",      "content": text})
+    history.append({"role": "assistant", "content": reply})
     if len(history) > MAX_HISTORY:
         history = history[-MAX_HISTORY:]
-    print(f"REPLY:{reply}", flush=True)
 
+    print(f"REPLY:{reply}", flush=True)
