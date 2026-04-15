@@ -83,15 +83,19 @@ def generate_with_retry(contents, config, retries=3, delay=5):
                 config=config
             )
         except Exception as e:
-            if "429" in str(e) and attempt < retries - 1:
-                print(f"Rate limited, waiting {delay}s...", flush=True)
+            error_str = str(e)
+            if ("429" in error_str or "503" in error_str) and attempt < retries - 1:
+                print(f"API unavailable, waiting {delay}s...", flush=True)
                 time.sleep(delay)
                 delay *= 2
             else:
                 raise
 
 history = []
+MAX_HISTORY = 20
 
+
+    
 for line in sys.stdin:
     text = line.strip()
     if not text:
@@ -129,4 +133,7 @@ for line in sys.stdin:
         print(f"ERROR: {e}", flush=True)
 
     history.append(types.Content(role="model", parts=[types.Part(text=reply)]))
+    if len(history) > MAX_HISTORY:
+        history = history[-MAX_HISTORY:]
     print(f"REPLY:{reply}", flush=True)
+
