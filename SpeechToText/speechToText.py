@@ -11,10 +11,6 @@ SAMPLE_RATE = 16000
 HALLUCINATION_PHRASES = [
     "they may use numbers",
     "the speaker is a university student",
-    "thank you for watching",
-    "thanks for watching",
-    "please subscribe",
-    "subtitles by",
 ]
 
 print("Loading SpeechToText...", flush=True)

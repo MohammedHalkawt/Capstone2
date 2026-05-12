@@ -12,7 +12,7 @@ if not api_key:
     raise ValueError("GEMINI_API_KEY not found in .env file")
 
 client = genai.Client(api_key=api_key)
-PDF_DIR = os.path.dirname(__file__)
+TXT_DIR = os.path.dirname(__file__)
 
 SYSTEM_PROMPT = """You are a university advisor AI — think JARVIS from Iron Man. Calm, composed, subtly witty, never over-eager.
 You have been provided with the university's academic calendar and course catalog. Use them to answer student questions accurately.
@@ -42,13 +42,13 @@ UNI_KEYWORDS = [
 print("Uploading university documents...", flush=True)
 
 file_calendar = client.files.upload(
-    file=os.path.join(PDF_DIR, "25-26Calendar.pdf"),
-    config={"mime_type": "application/pdf"}
+    file=os.path.join(TXT_DIR, "01_FULL_AUIS_academic_calendar_2025_2026.txt"),
+    config={"mime_type": "text/plain"}
 )
 
 file_catalog = client.files.upload(
-    file=os.path.join(PDF_DIR, "2026catalog.pdf"),
-    config={"mime_type": "application/pdf"}
+    file=os.path.join(TXT_DIR, "02_FULL_AUIS_academic_catalog_2026.txt"),
+    config={"mime_type": "text/plain"}
 )
 
 print("Documents uploaded.", flush=True)
@@ -58,7 +58,7 @@ last_text = ""
 last_time = 0
 DEDUP_WINDOW = 8
 
-def needs_pdf(text):
+def needs_docs(text):
     text_lower = text.lower()
     if any(kw in text_lower for kw in UNI_KEYWORDS):
         return True
@@ -77,8 +77,6 @@ def needs_pdf(text):
 def generate_with_retry(contents, config, retries=3, delay=5):
     for attempt in range(retries):
         try:
-            # model="models/gemini-2.5-flash-lite",
-
             return client.models.generate_content(
                 model="models/gemini-3.1-flash-lite-preview",
                 contents=contents,
@@ -96,8 +94,6 @@ def generate_with_retry(contents, config, retries=3, delay=5):
 history = []
 MAX_HISTORY = 20
 
-
-    
 for line in sys.stdin:
     text = line.strip()
     if not text:
@@ -113,11 +109,11 @@ for line in sys.stdin:
 
     history.append(types.Content(role="user", parts=[types.Part(text=text)]))
 
-    if needs_pdf(text):
+    if needs_docs(text):
         contents = [
             types.Content(role="user", parts=[
-                types.Part.from_uri(file_uri=file_calendar.uri, mime_type="application/pdf"),
-                types.Part.from_uri(file_uri=file_catalog.uri, mime_type="application/pdf"),
+                types.Part.from_uri(file_uri=file_calendar.uri, mime_type="text/plain"),
+                types.Part.from_uri(file_uri=file_catalog.uri, mime_type="text/plain"),
             ]),
             *history,
         ]
@@ -132,10 +128,9 @@ for line in sys.stdin:
         reply = response.text.strip()
     except Exception as e:
         reply = "I encountered an error; please try again in a moment."
-        print(f"ERROR: {e}", flush=True)
+        print(f"ERROR: {e}", file=sys.stderr, flush=True)
 
     history.append(types.Content(role="model", parts=[types.Part(text=reply)]))
     if len(history) > MAX_HISTORY:
         history = history[-MAX_HISTORY:]
     print(f"REPLY:{reply}", flush=True)
-
