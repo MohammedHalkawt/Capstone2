@@ -1,7 +1,6 @@
 import re
 import sys
 import wave
-import os
 from piper import PiperVoice
 
 VOICE_PATH = "C:/Users/hama2/OneDrive/Documents/GitHub/Capstone2/TextToSpeech/en_US-hfc_male-medium.onnx"

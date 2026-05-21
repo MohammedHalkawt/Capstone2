@@ -28,7 +28,8 @@ Rules:
 - Only state course codes that appear in the provided documents
 - If more detail is needed beyond 1 sentence, tell them to visit the registrar
 - If the answer is not in the documents, say so briefly and suggest they contact the registrar
-- small talk and jokes can happen and not everything is about the accademics"""
+- small talk can happen but less frequent jokes
+- Currently its spring 2026"""
 
 UNI_KEYWORDS = [
     "course", "class", "semester", "credit", "grade", "register",
@@ -64,7 +65,8 @@ def needs_docs(text):
         return True
     try:
         check = client.models.generate_content(
-            model="models/gemini-3.1-flash-lite-preview",
+            model="models/gemini-2.5-flash-lite",
+            #model="models/gemini-3.1-flash-lite-preview",
             contents=[{
                 "role": "user",
                 "parts": [{"text": f"Is this question about university, academics, courses, or student life? Answer only yes or no:\n{text}"}]
@@ -78,7 +80,8 @@ def generate_with_retry(contents, config, retries=3, delay=5):
     for attempt in range(retries):
         try:
             return client.models.generate_content(
-                model="models/gemini-3.1-flash-lite-preview",
+                model="models/gemini-2.5-flash-lite",
+                #model="models/gemini-3.1-flash-lite-preview",
                 contents=contents,
                 config=config
             )
