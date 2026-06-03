@@ -8,22 +8,23 @@ const app = express();
 const upload = multer();
 app.use(express.static("public"));
 
-// ========== Persistent Python Subprocesses ==========
+
 const whisperPy = spawn("python", [
   "C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\SpeechToText\\speechToText.py"
 ]);
 const geminiPy = spawn("python", [
   "C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\KioskProject\\AI_Model\\assistant.py"
 ]);
-const ttsPy = spawn("python", [
-  "C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\TextToSpeech\\textToSpeech.py"
-]);
+const ttsPy = spawn(
+  "C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\venv\\Scripts\\python.exe",
+  ["C:\\Users\\hama2\\OneDrive\\Documents\\GitHub\\Capstone2\\TextToSpeech\\textToSpeech.py"]
+);
 
-// ========== Request Tracking ==========
+
 let nextRequestId = 1;
-const pendingRequests = new Map(); // requestId -> { resolve, reject, timer, type }
+const pendingRequests = new Map();
 
-// Helper to register a pending request
+
 function registerRequest(type, timeoutMs = 30000) {
   const id = nextRequestId++;
   let timer = setTimeout(() => {
@@ -39,7 +40,7 @@ function registerRequest(type, timeoutMs = 30000) {
   return { id, promise };
 }
 
-// Helper to resolve a pending request by ID
+
 function resolveRequest(id, data) {
   const pending = pendingRequests.get(id);
   if (pending) {
@@ -58,7 +59,8 @@ function rejectRequest(id, error) {
   }
 }
 
-// ========== Whisper Output Parsing ==========
+
+
 let whisperBuffer = "";
 whisperPy.stdout.on("data", (data) => {
   whisperBuffer += data.toString();
@@ -67,11 +69,7 @@ whisperPy.stdout.on("data", (data) => {
   for (const line of lines) {
     if (line.startsWith("FINAL:")) {
       const text = line.replace("FINAL:", "").trim();
-      // Extract request ID if embedded (we'll embed it in the PCM stream)
-      // Since we can't easily pass ID through stdin, we'll use a different approach:
-      // We'll send the ID as the first 4 bytes of the PCM data (overloading length?)
-      // Simpler: Because we serialize requests (queue), the next FINAL belongs to the current pendingWhisper.
-      // But we need to know which request. We'll store a currentWhisperId.
+
       if (currentWhisperId !== null) {
         resolveRequest(currentWhisperId, text);
         currentWhisperId = null;
@@ -85,7 +83,7 @@ whisperPy.stderr.on("data", (data) => {
   console.error("SpeechToText ERROR:", data.toString());
 });
 
-// ========== Gemini Output Parsing ==========
+
 let geminiBuffer = "";
 geminiPy.stdout.on("data", (data) => {
   geminiBuffer += data.toString();
@@ -107,7 +105,7 @@ geminiPy.stderr.on("data", (data) => {
   console.error("Assistant ERROR:", data.toString());
 });
 
-// ========== TTS Output Parsing ==========
+
 let ttsBuffer = "";
 ttsPy.stdout.on("data", (data) => {
   ttsBuffer += data.toString();
@@ -116,7 +114,6 @@ ttsPy.stdout.on("data", (data) => {
   for (const line of lines) {
     if (line.trim() === "DONE") {
       if (currentTtsId !== null) {
-        // TTS done, now read the file
         const ttsOut = path.resolve("tts_out.wav");
         fs.readFile(ttsOut, (err, audioBuffer) => {
           if (err) {
@@ -136,12 +133,11 @@ ttsPy.stderr.on("data", (data) => {
   console.error("TextToSpeech ERROR:", data.toString());
 });
 
-// ========== Active Request IDs ==========
+
 let currentWhisperId = null;
 let currentGeminiId = null;
 let currentTtsId = null;
 
-// ========== Queue (serialize because TTS uses fixed file) ==========
 let busy = false;
 const queue = [];
 
@@ -151,13 +147,10 @@ async function processNext() {
   const { audioBuffer, res } = queue.shift();
 
   try {
-    // 1. Convert to PCM (ffmpeg – still per request, quick)
     const pcm = await convertToPcm(audioBuffer);
 
-    // 2. Whisper STT
     const { id: whisperId, promise: whisperPromise } = registerRequest("Whisper", 15000);
     currentWhisperId = whisperId;
-    // Send PCM data to whisperPy
     const lenBuf = Buffer.alloc(4);
     lenBuf.writeUInt32LE(pcm.length, 0);
     whisperPy.stdin.write(lenBuf);
@@ -169,7 +162,6 @@ async function processNext() {
       return;
     }
 
-    // 3. Gemini reply
     const { id: geminiId, promise: geminiPromise } = registerRequest("Gemini", 30000);
     currentGeminiId = geminiId;
     geminiPy.stdin.write(transcribed + "\n");
@@ -180,13 +172,11 @@ async function processNext() {
       return;
     }
 
-    // 4. TTS audio
     const { id: ttsId, promise: ttsPromise } = registerRequest("TTS", 30000);
     currentTtsId = ttsId;
     ttsPy.stdin.write(reply + "\n");
     const audio = await ttsPromise;
 
-    // 5. Send JSON response
     res.json({
       text: reply,
       audio: audio.toString("base64"),

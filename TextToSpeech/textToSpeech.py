@@ -1,10 +1,18 @@
-import re
-import sys
-import wave
-import torch
-from TTS.api import TTS
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ["TQDM_DISABLE"] = "1"
 
-# ---------------- Normalization (from your Piper script) ----------------
+import sys
+import re
+import wave
+import numpy as np
+import torch
+import torchaudio
+import scipy.signal as signal
+from chatterbox.tts_turbo import ChatterboxTurboTTS
+
+# ---------------- Normalization ----------------
 ROMAN = {
     'viii': 'eight', 'vii': 'seven', 'vi': 'six',
     'iv': 'four', 'iii': 'three', 'ii': 'two', 'ix': 'nine',
@@ -26,9 +34,9 @@ def normalize(text):
     for roman, word in ROMAN.items():
         text = re.sub(r'\b' + roman.lower() + r'\b', word, text)
 
-    text = re.sub(r'\b([a-z]{2,4})(\d{3,4})\b', 
+    text = re.sub(r'\b([a-z]{2,4})(\d{3,4})\b',
                   lambda m: '. '.join(list(m.group(1))) + '. ' + m.group(2), text)
-    text = re.sub(r'\b([a-z]{2,4})\s+(\d{3,4})\b', 
+    text = re.sub(r'\b([a-z]{2,4})\s+(\d{3,4})\b',
                   lambda m: '. '.join(list(m.group(1))) + '. ' + m.group(2), text)
 
     ones = {'1':'one','2':'two','3':'three','4':'four','5':'five',
@@ -36,39 +44,41 @@ def normalize(text):
     text = re.sub(r'\b(\d)s\b', lambda m: ones.get(m.group(1), m.group(1)) + 's', text)
     return text
 
-# ---------------- Coqui XTTS with Jarvis clone ----------------
+# ---------------- Load model ----------------
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {device}", flush=True)
 
-# Load XTTS v2 (this model can clone voices)
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+model = ChatterboxTurboTTS.from_pretrained(device=device)
 
-# Your Jarvis reference audio (make sure the path is correct)
 JARVIS_WAV = r"C:\Users\hama2\OneDrive\Desktop\tts\jarvis-intro-1.wav"
+SPEED_FACTOR = 1.0  # adjust if needed
 
 print("READY (Jarvis voice cloned)", flush=True)
 
-# Process stdin line by line, exactly like the Piper script
+# ---------------- Main loop ----------------
 for line in sys.stdin:
     text = line.strip()
     if not text:
         continue
-    text = normalize(text)   # reuse your normalizer
+    text = normalize(text)
 
-    # Synthesize using the cloned voice
-    wav_numpy = tts.tts(
-        text=text,
-        speaker_wav=JARVIS_WAV,
-        language="en"
+    wav = model.generate(
+        text,
+        audio_prompt_path=JARVIS_WAV,
+        cfg_weight=0.3
     )
 
-    # Write to a WAV file (16 kHz mono, float32 -> int16)
-    with wave.open("tts_out.wav", "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)          # 16‑bit
-        wf.setframerate(24000)      # XTTS v2 uses 24 kHz by default
-        # Convert float32 array (-1..1) to int16
-        int16_data = (wav_numpy * 32767).astype(np.int16).tobytes()
-        wf.writeframes(int16_data)
+    wav_numpy = wav.squeeze().cpu().numpy()
+
+    # Speed adjustment
+    if SPEED_FACTOR != 1.0:
+        new_len = int(len(wav_numpy) / SPEED_FACTOR)
+        wav_numpy = signal.resample(wav_numpy, new_len)
+
+    torchaudio.save(
+        "tts_out.wav",
+        torch.tensor(wav_numpy).unsqueeze(0),
+        model.sr
+    )
 
     print("DONE", flush=True)
