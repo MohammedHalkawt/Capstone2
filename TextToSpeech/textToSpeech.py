@@ -1,15 +1,10 @@
 import warnings
 warnings.filterwarnings("ignore")
-import os
-os.environ["TQDM_DISABLE"] = "1"
 
 import sys
 import re
-import wave
-import numpy as np
 import torch
 import torchaudio
-import scipy.signal as signal
 from chatterbox.tts_turbo import ChatterboxTurboTTS
 
 # ---------------- Normalization ----------------
@@ -19,6 +14,11 @@ ROMAN = {
     'v': 'five', 'x': 'ten'
 }
 
+ones = {
+    '1':'one','2':'two','3':'three','4':'four','5':'five',
+    '6':'six','7':'seven','8':'eight','9':'nine','0':'zero'
+}
+
 def normalize(text):
     roman_upper = set(k.upper() for k in ROMAN.keys())
 
@@ -26,22 +26,23 @@ def normalize(text):
         acronym = match.group(1)
         if acronym in roman_upper:
             return acronym
-        return '. '.join(list(acronym)) + '.'
+        return ' '.join(list(acronym))
 
-    text = re.sub(r'\b([A-Z]{2,5})\b(?! \d{3,4})', expand_acronyms, text)
+    text = re.sub(r'\b([A-Z]{2,5})\b', expand_acronyms, text)
     text = text.lower()
+    text = text.replace(':', ',')
+    text = text.replace(';', ',')
 
     for roman, word in ROMAN.items():
         text = re.sub(r'\b' + roman.lower() + r'\b', word, text)
 
-    text = re.sub(r'\b([a-z]{2,4})(\d{3,4})\b',
-                  lambda m: '. '.join(list(m.group(1))) + '. ' + m.group(2), text)
-    text = re.sub(r'\b([a-z]{2,4})\s+(\d{3,4})\b',
-                  lambda m: '. '.join(list(m.group(1))) + '. ' + m.group(2), text)
+    # Read 3-4 digit numbers digit by digit (e.g. 491 -> "four nine one")
+    text = re.sub(r'\b(\d{3,4})\b',
+                  lambda m: ' '.join(ones.get(d, d) for d in m.group(0)), text)
 
-    ones = {'1':'one','2':'two','3':'three','4':'four','5':'five',
-            '6':'six','7':'seven','8':'eight','9':'nine','0':'zero'}
+    # Single digit followed by s (e.g. 3s -> threes)
     text = re.sub(r'\b(\d)s\b', lambda m: ones.get(m.group(1), m.group(1)) + 's', text)
+
     return text
 
 # ---------------- Load model ----------------
@@ -51,7 +52,6 @@ print(f"Using device: {device}", flush=True)
 model = ChatterboxTurboTTS.from_pretrained(device=device)
 
 JARVIS_WAV = r"C:\Users\hama2\OneDrive\Desktop\tts\jarvis-intro-1.wav"
-SPEED_FACTOR = 1.0  # adjust if needed
 
 print("READY (Jarvis voice cloned)", flush=True)
 
@@ -65,15 +65,11 @@ for line in sys.stdin:
     wav = model.generate(
         text,
         audio_prompt_path=JARVIS_WAV,
-        cfg_weight=0.3
+        top_k=200,
+        temperature=0.8
     )
 
     wav_numpy = wav.squeeze().cpu().numpy()
-
-    # Speed adjustment
-    if SPEED_FACTOR != 1.0:
-        new_len = int(len(wav_numpy) / SPEED_FACTOR)
-        wav_numpy = signal.resample(wav_numpy, new_len)
 
     torchaudio.save(
         "tts_out.wav",
