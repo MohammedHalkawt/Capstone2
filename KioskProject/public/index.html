@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -108,6 +109,23 @@
     }
 
     .mic-circle.speaking { background: #fff; color: #0a0a0a; }
+
+    .ai-subtitle {
+      max-width: 900px;
+      margin: 30px auto 0;
+      padding: 24px 30px;
+      font-size: 32px;
+      font-weight: 600;
+      line-height: 1.4;
+      color: #fff;
+      background: #0a0a0a;
+      border: 3px solid #fff;
+      border-radius: 14px;
+      text-align: center;
+      min-height: 80px;
+      display: none;
+    }
+    .ai-subtitle.visible { display: block; }
   </style>
 </head>
 <body>
@@ -161,6 +179,7 @@
       <div class="title-txt">ASSISTANT</div>
       <div id="mic" class="mic-circle">MIC</div>
       <div class="sub-txt" id="ai-txt">READY</div>
+      <div id="ai-subtitle" class="ai-subtitle"></div>
     </div>
 
   </div>
@@ -533,6 +552,7 @@
     if (isRecordingActive) return;
 
     stopCurrentAudio();
+    document.getElementById('ai-subtitle').classList.remove('visible');
 
     isRecordingActive = true;
     navigator.mediaDevices.getUserMedia({
@@ -565,16 +585,27 @@
           fetch('/audio', { method: 'POST', body: formData })
             .then(function(res) {
               if (!res.ok) { btnMic.classList.remove('processing'); stopWaitTone(); txtMic.innerText = 'ERROR'; return; }
-              return res.blob();
+              return res.json();
             })
-            .then(function(blob) {
-              if (!blob) { btnMic.classList.remove('processing'); stopWaitTone(); return; }
+            .then(function(data) {
+              if (!data) { btnMic.classList.remove('processing'); stopWaitTone(); return; }
+
+              var byteChars = atob(data.audio);
+              var byteNums = new Array(byteChars.length);
+              for (var i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+              var blob = new Blob([new Uint8Array(byteNums)], { type: data.mime || 'audio/wav' });
               var url = URL.createObjectURL(blob);
+
               currentAudio = new Audio(url);
               stopWaitTone();
               btnMic.classList.remove('processing');
               btnMic.classList.add('speaking');
               txtMic.innerText = 'SPEAKING...';
+
+              var subtitleBox = document.getElementById('ai-subtitle');
+              subtitleBox.innerText = data.text || '';
+              subtitleBox.classList.add('visible');
+
               startSpeakAnimation(currentAudio);
               currentAudio.play();
               currentAudio.onended = function() {
