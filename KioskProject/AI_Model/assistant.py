@@ -1,9 +1,10 @@
 import sys
 import os
+import time
 from google import genai
 from dotenv import load_dotenv
 from google.genai import types
-import time
+from google.genai.errors import ClientError
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -40,16 +41,44 @@ UNI_KEYWORDS = [
     "internship", "capstone", "thesis", "elective", "required"
 ]
 
+def upload_with_retry(file_path, mime_type, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            return client.files.upload(
+                file=file_path,
+                config={"mime_type": mime_type}
+            )
+        except ClientError as e:
+            error_str = str(e)
+            if "terminated" in error_str and attempt < retries - 1:
+                print(f"Upload terminated, retrying in {delay}s...", flush=True)
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
+        except Exception as e:
+            if attempt < retries - 1:
+                print(f"Upload error: {e}, retrying in {delay}s...", flush=True)
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
+
 print("Uploading university documents...", flush=True)
 
-file_calendar = client.files.upload(
-    file=os.path.join(TXT_DIR, "01_FULL_AUIS_academic_calendar_2025_2026.txt"),
-    config={"mime_type": "text/plain"}
+# Upload calendar
+file_calendar = upload_with_retry(
+    os.path.join(TXT_DIR, "01_FULL_AUIS_academic_calendar_2025_2026.txt"),
+    "text/plain"
 )
 
-file_catalog = client.files.upload(
-    file=os.path.join(TXT_DIR, "02_FULL_AUIS_academic_catalog_2026.txt"),
-    config={"mime_type": "text/plain"}
+# Critical: small delay to avoid session conflicts
+time.sleep(2)
+
+# Upload catalog
+file_catalog = upload_with_retry(
+    os.path.join(TXT_DIR, "02_FULL_AUIS_academic_catalog_2026.txt"),
+    "text/plain"
 )
 
 print("Documents uploaded.", flush=True)
